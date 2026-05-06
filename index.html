@@ -86,7 +86,7 @@
 
     @keyframes jumpAnim {
       0%   { transform: translateY(0); }
-      40%  { transform: translateY(-110px); }
+      40%  { transform: translateY(-145px); }
       100% { transform: translateY(0); }
     }
 
@@ -192,9 +192,9 @@
     let obstacles   = [];
     let animFrame;
     let lastTime    = 0;
-    let speed       = 220;   // px per second
+    let speed       = 200;   // px per second
     let spawnTimer  = 0;
-    let spawnInterval = 1.8; // seconds
+    let spawnInterval = 2.2; // seconds
     let isJumping   = false;
     let jumpLocked  = false;
 
@@ -203,9 +203,9 @@
 
     function resetGame() {
       score = 0;
-      speed = 220;
+      speed = 200;
       spawnTimer = 0;
-      spawnInterval = 1.8;
+      spawnInterval = 2.2;
       isJumping = false;
       jumpLocked = false;
       scoreEl.textContent = '0';
@@ -243,8 +243,8 @@
       el.className = 'obstacle';
       const emoji = OREO_EMOJIS[Math.floor(Math.random() * OREO_EMOJIS.length)];
       el.textContent = emoji;
-      // たまに2段積み
-      const double = Math.random() < 0.25 && score > 10;
+      // たまに2段積み（スコア100超えたあとだけ、低確率）
+      const double = Math.random() < 0.15 && Math.floor(score) > 100;
       if (double) {
         el.style.fontSize = '2.4rem';
         const el2 = document.createElement('span');
@@ -277,10 +277,10 @@
       let jumpOffset = 0;
       if (isJumping) {
         // 0→40%→100% of 550ms
-        // ピーク高さ110px。簡易：sin近似
+        // ピーク高さ145px。簡易：sin近似
         const elapsed = performance.now() - jumpStart;
         const t = Math.min(elapsed / 550, 1);
-        jumpOffset = Math.sin(t * Math.PI) * 110;
+        jumpOffset = Math.sin(t * Math.PI) * 145;
       }
       return {
         left:   px,
@@ -310,20 +310,24 @@
       const dt = Math.min((now - lastTime) / 1000, 0.1);
       lastTime = now;
 
-      // スコア加算（時間ベース）
-      score += dt * 10;
+      // スコア加算（時間ベース：1点/秒）
+      score += dt * 1;
       scoreEl.textContent = Math.floor(score);
 
       // 難易度上昇
       const s = Math.floor(score);
-      speed = 220 + s * 0.8;
-      spawnInterval = Math.max(0.9, 1.8 - s * 0.004);
+      speed = 200 + s * 2.2;
+      spawnInterval = Math.max(0.8, 2.2 - s * 0.035);
 
-      // 障害物スポーン
+      // 障害物スポーン（不規則出現あり）
       spawnTimer += dt;
       if (spawnTimer >= spawnInterval) {
         spawnTimer = 0;
         spawnObstacle();
+        // スコア5以降、たまに連続2個（少し間隔を空けて）
+        if (s >= 5 && Math.random() < 0.25) {
+          setTimeout(spawnObstacle, 500 + Math.random() * 200);
+        }
       }
 
       // 障害物移動 & 当たり判定 & 削除
