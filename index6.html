@@ -148,7 +148,8 @@
         ],
       },
       {
-        name: 'しかく', width: 44,
+        name: 'しかく', width: 58,
+        worldW: 1200, worldH: 1440,
         pts: [
           [0.50, 0.88], [0.80, 0.88], [0.90, 0.70],
           [0.90, 0.30], [0.80, 0.12], [0.50, 0.12],
@@ -157,7 +158,8 @@
         ],
       },
       {
-        name: 'くるくる', width: 40,
+        name: 'くるくる', width: 54,
+        worldW: 1200, worldH: 1440,
         pts: [
           [0.50, 0.90], [0.72, 0.85], [0.85, 0.72],
           [0.85, 0.55], [0.70, 0.46], [0.55, 0.40],
@@ -184,7 +186,9 @@
     function initTrack(idx) {
       currentCourse = idx;
       const c = COURSES[idx];
-      TRACK_PTS = c.pts.map(([nx, ny]) => ({ x: nx * CW, y: ny * CH }));
+      const ww = c.worldW || CW;
+      const wh = c.worldH || CH;
+      TRACK_PTS = c.pts.map(([nx, ny]) => ({ x: nx * ww, y: ny * wh }));
       TRACK_W   = c.width;
       SEG_COUNT = TRACK_PTS.length;
       segLen = []; totalLen = 0;
@@ -385,6 +389,18 @@
       car.x += Math.cos(car.angle) * car.speed * dt;
       car.y += Math.sin(car.angle) * car.speed * dt;
 
+      // Wall: push car back if too far outside track boundary
+      const nearTp = trackPos(car.prog);
+      const wdx = car.x - nearTp.x, wdy = car.y - nearTp.y;
+      const wd  = Math.hypot(wdx, wdy);
+      const WALL_LIMIT = TRACK_W + 16;
+      if (wd > WALL_LIMIT && wd > 0) {
+        car.x = nearTp.x + wdx / wd * WALL_LIMIT;
+        car.y = nearTp.y + wdy / wd * WALL_LIMIT;
+        // Slow down on wall hit but keep a minimum speed so player can steer out
+        car.speed = Math.max(18, car.speed * 0.4);
+      }
+
       // update progress
       const newProg = worldToProgress(car.x, car.y, car.prog);
       // detect crossing finish line (prog wraps 0.95→0.05 etc.)
@@ -488,12 +504,14 @@
       ctx.rotate(-camAngle - Math.PI / 2);
       ctx.translate(-player.x, -player.y);
 
-      // Grass world background (covers full track area + margins)
+      // Grass world background — tile around player so large worlds are covered
+      const px0 = Math.floor(player.x / 40) * 40;
+      const py0 = Math.floor(player.y / 40) * 40;
       ctx.fillStyle = '#388e3c';
-      ctx.fillRect(-120, -120, CW + 240, CH + 240);
+      ctx.fillRect(px0 - 640, py0 - 640, 1280, 1280);
       ctx.fillStyle = '#2e7d32';
-      for (let gx = -100; gx < CW + 100; gx += 40)
-        for (let gy = -100; gy < CH + 100; gy += 40)
+      for (let gx = px0 - 600; gx < px0 + 600; gx += 40)
+        for (let gy = py0 - 600; gy < py0 + 600; gy += 40)
           ctx.fillRect(gx + 6, gy + 6, 10, 10);
 
       drawTrack();
@@ -557,10 +575,17 @@
       ctx.fillStyle = 'rgba(0,0,0,0.5)';
       ctx.beginPath(); ctx.roundRect(mx - 4, my - 4, mw + 8, mh + 8, 8); ctx.fill();
 
+      // Bounding box of track for scaling
+      let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+      for (const p of TRACK_PTS) {
+        if (p.x < minX) minX = p.x; if (p.x > maxX) maxX = p.x;
+        if (p.y < minY) minY = p.y; if (p.y > maxY) maxY = p.y;
+      }
+      const rangeX = (maxX - minX) || 1, rangeY = (maxY - minY) || 1;
+      const scaleX = x => mx + ((x - minX) / rangeX) * mw;
+      const scaleY = y => my + ((y - minY) / rangeY) * mh;
+
       // track outline
-      ctx.beginPath();
-      const scaleX = x => mx + (x / CW) * mw;
-      const scaleY = y => my + (y / CH) * mh;
       ctx.moveTo(scaleX(TRACK_PTS[0].x), scaleY(TRACK_PTS[0].y));
       for (let i = 1; i <= SEG_COUNT; i++) {
         ctx.lineTo(scaleX(TRACK_PTS[i % SEG_COUNT].x), scaleY(TRACK_PTS[i % SEG_COUNT].y));
