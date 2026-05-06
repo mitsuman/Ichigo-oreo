@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🍞 パンオレオシーソー 🍪</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: linear-gradient(160deg, #e3f2fd 0%, #fffde7 100%);
+      display: flex; flex-direction: column; align-items: center;
+      padding: 12px 8px 16px; min-height: 100vh;
+      font-family: "Hiragino Maru Gothic Pro", "Rounded Mplus 1c", sans-serif;
+      user-select: none; touch-action: none;
+    }
+    #game-nav {
+      display: flex; gap: 8px; margin-bottom: 10px;
+      flex-wrap: wrap; justify-content: center;
+    }
+    #game-nav a {
+      padding: 6px 12px; border-radius: 50px; text-decoration: none;
+      font-size: 0.8rem; font-weight: bold; border: 3px solid transparent;
+      background: rgba(255,255,255,0.75); color: #555; transition: transform 0.1s;
+    }
+    #game-nav a:hover { transform: scale(1.05); }
+    #game-nav a.active { background: #6d4c41; color: #fff; border-color: #4e342e; }
+    #game-nav a:not(.active):hover { background: #efebe9; color: #6d4c41; border-color: #6d4c41; }
+    h1 { font-size: 1.7rem; color: #4e342e; text-shadow: 2px 2px 0 #fff; margin-bottom: 8px; text-align: center; }
+    #hud { display: flex; gap: 16px; font-size: 1.05rem; font-weight: bold; color: #4e342e; margin-bottom: 8px; }
+    #canvas-wrap { position: relative; }
+    canvas { display: block; border-radius: 20px; border: 4px solid #6d4c41; box-shadow: 0 6px 24px #6d4c4144; }
+    #overlay {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: rgba(255,255,255,0.93); border-radius: 17px;
+      gap: 10px; z-index: 10; padding: 20px;
+    }
+    #overlay h2 { font-size: 1.7rem; color: #4e342e; text-align: center; line-height: 1.4; }
+    #overlay p  { font-size: 1rem; color: #555; text-align: center; line-height: 2.0; }
+    #start-btn {
+      padding: 14px 48px; font-size: 1.4rem; background: #6d4c41; color: #fff; border: none;
+      border-radius: 50px; cursor: pointer; font-family: inherit;
+      box-shadow: 0 4px 12px #6d4c4166; transition: transform 0.1s;
+    }
+    #start-btn:active { transform: scale(0.95); }
+    #touch-controls { display: flex; gap: 20px; margin-top: 10px; }
+    .tbtn {
+      width: 110px; height: 64px; font-size: 2rem;
+      background: rgba(255,255,255,0.85); border: 3px solid #6d4c41;
+      border-radius: 16px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    }
+    .tbtn:active { background: #efebe9; }
+    #hint { margin-top: 8px; font-size: 0.95rem; color: #4e342e; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <nav id="game-nav">
+    <a href="index.html">🍓 イチゴ</a>
+    <a href="index2.html">🍈 メロン</a>
+    <a href="index3.html">🍍 パイナップル</a>
+    <a href="index4.html">🍌 バナナ</a>
+    <a href="index5.html" class="active">🍞 パン</a>
+  </nav>
+
+  <h1>🍞 パンオレオシーソー 🍪</h1>
+
+  <div id="hud">
+    <span>タイム：<span id="score">0</span>びょう</span>
+    <span>さいこう：<span id="best">0</span></span>
+    <span>おもさ：<span id="weight">4</span>kg</span>
+  </div>
+
+  <div id="canvas-wrap">
+    <canvas id="canvas" width="400" height="460"></canvas>
+    <div id="overlay">
+      <div style="font-size:3rem">🍞</div>
+      <h2 id="ov-title">パンオレオシーソー！</h2>
+      <p id="ov-msg">
+        ◀ ▶ で うごいて<br>
+        シーソーの バランスをとろう！<br>
+        ☁️ ものが おちてくる！<br>
+        ⭐ ほしを つかむと ボーナス！
+      </p>
+      <button id="start-btn">▶ はじめる！</button>
+    </div>
+  </div>
+
+  <div id="touch-controls">
+    <div class="tbtn" id="btn-left">◀</div>
+    <div class="tbtn" id="btn-right">▶</div>
+  </div>
+  <div id="hint">◀ ▶ キー または ボタンで　うごこう！</div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx    = canvas.getContext('2d');
+    const CW = 400, CH = 460;
+
+    // ── Seesaw geometry ──────────────────────────────────────
+    const PIVOT_X  = CW / 2;
+    const PIVOT_Y  = 285;
+    const SS_HALF  = 155;   // half-length in pixels
+    const SS_THICK = 22;    // plank thickness
+
+    // ── Physics ──────────────────────────────────────────────
+    const INERTIA    = 9000;  // large = slow response
+    const ANG_DAMP   = 0.38;  // angVel decay per second
+    const MAX_ANGLE  = 0.88;  // rad (~50°) game over
+    const WARN_ANGLE = 0.48;  // rad (~27°) warning
+
+    // ── Player ───────────────────────────────────────────────
+    const PLAYER_SPEED       = 1.05; // normalized pos/s
+    const INIT_PLAYER_WEIGHT = 4;
+    const PICK_RADIUS        = 52;   // px horizontal catch distance
+
+    // ── Item types ───────────────────────────────────────────
+    const ITEM_TYPES = [
+      { emoji: '\u{1F36A}', weight: 4 },           // cookie (oreo)
+      { emoji: '\u{1F381}', weight: 6 },           // gift
+      { emoji: '\u{2B50}',  weight: 1, bonus: 5 }, // star
+      { emoji: '\u{1F34E}', weight: 3 },           // apple
+      { emoji: '\u{1F9F1}', weight: 5 },           // brick
+      { emoji: '\u{1F388}', weight: 1 },           // balloon
+      { emoji: '\u{1F338}', weight: 2 },           // cherry blossom
+      { emoji: '\u{1F382}', weight: 7 },           // birthday cake
+    ];
+
+    // ── Drawing helper ───────────────────────────────────────
+    function rrect(x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y,     x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x,     y + h, r);
+      ctx.arcTo(x,     y + h, x,     y,     r);
+      ctx.arcTo(x,     y,     x + w, y,     r);
+      ctx.closePath();
+    }
+
+    // Y of seesaw surface at screen X
+    function ssY(sx) {
+      return PIVOT_Y + (sx - PIVOT_X) * Math.tan(angle);
+    }
+
+    // Normalized pos (-1..1) from screen X
+    function normPos(sx) {
+      return (sx - PIVOT_X) / (Math.cos(angle) * SS_HALF);
+    }
+
+    // Screen pos of normalized seesaw position
+    function ssScreenPos(p) {
+      const d = p * SS_HALF;
+      return { x: PIVOT_X + d * Math.cos(angle), y: PIVOT_Y + d * Math.sin(angle) };
+    }
+
+    // Net torque (positive = right side down)
+    function torque() {
+      let t = playerWeight * playerPos;
+      for (const it of fixedItems) t += it.weight * it.pos;
+      return t * SS_HALF;
+    }
+
+    function addEffect(x, y, text, color) {
+      effects.push({ x, y, text, color: color || '#fff700', life: 1.0 });
+    }
+
+    // ── State ────────────────────────────────────────────────
+    let angle, angVel, playerPos, playerWeight;
+    let fixedItems, fallingItems, effects;
+    let score, bonusScore, best;
+    let spawnTimer, spawnInterval;
+    let gameRunning, lastTime;
+    let keys = { left: false, right: false };
+    best = 0;
+
+    const scoreEl  = document.getElementById('score');
+    const bestEl   = document.getElementById('best');
+    const weightEl = document.getElementById('weight');
+    const overlay  = document.getElementById('overlay');
+    const ovTitle  = document.getElementById('ov-title');
+    const ovMsg    = document.getElementById('ov-msg');
+    const startBtn = document.getElementById('start-btn');
+
+    // ── Init ─────────────────────────────────────────────────
+    function resetGame() {
+      angle = 0; angVel = 0;
+      playerPos = 0; playerWeight = INIT_PLAYER_WEIGHT;
+      fixedItems = []; fallingItems = []; effects = [];
+      score = 0; bonusScore = 0;
+      spawnTimer = 1.2; spawnInterval = 1.8;
+      scoreEl.textContent = '0';
+      weightEl.textContent = INIT_PLAYER_WEIGHT;
+    }
+
+    function startGame() {
+      resetGame();
+      overlay.style.display = 'none';
+      gameRunning = true;
+      lastTime = performance.now();
+      requestAnimationFrame(gameLoop);
+    }
+
+    function endGame() {
+      gameRunning = false;
+      const fs = Math.floor(score);
+      if (fs > best) { best = fs; bestEl.textContent = best; }
+      const stars = fs >= 30 ? '\u2B50\u2B50\u2B50' : fs >= 15 ? '\u2B50\u2B50' : '\u2B50';
+      ovTitle.textContent = stars + ' ' + fs + '\u3073\u3087\u3046\uFF01';
+      ovMsg.innerHTML = '\u{1F31F} \u30DC\u30FC\u30CA\u30B9\uFF1A' + bonusScore + '\u3066\u3093<br>\u3055\u3044\u3053\u3046\u304D\u308D\u304F\uFF1A' + best + '\u3073\u3087\u3046';
+      startBtn.textContent = '\u25B6 \u3082\u3046\u3044\u3061\u3069\uFF01';
+      overlay.style.display = 'flex';
+    }
+
+    // ── Spawn ────────────────────────────────────────────────
+    function spawnItem() {
+      const type = ITEM_TYPES[Math.floor(Math.random() * ITEM_TYPES.length)];
+      const x = PIVOT_X - SS_HALF * 0.9 + Math.random() * (SS_HALF * 1.8);
+      fallingItems.push({
+        x: x, y: -36, vy: 105 + Math.random() * 65,
+        weight: type.weight, emoji: type.emoji, bonus: type.bonus || 0,
+      });
+    }
+
+    // ── Update ────────────────────────────────────────────────
+    function update(dt) {
+      score += dt;
+      scoreEl.textContent = Math.floor(score);
+      spawnInterval = Math.max(0.85, 1.8 - Math.floor(score) * 0.012);
+
+      if (keys.left)  playerPos -= PLAYER_SPEED * dt;
+      if (keys.right) playerPos += PLAYER_SPEED * dt;
+      playerPos = Math.max(-0.95, Math.min(0.95, playerPos));
+
+      const t = torque();
+      angVel += (t / INERTIA) * dt;
+      angVel *= Math.exp(-ANG_DAMP * dt);
+      angle  += angVel * dt;
+
+      if (Math.abs(angle) >= MAX_ANGLE) { endGame(); return; }
+
+      spawnTimer -= dt;
+      if (spawnTimer <= 0) {
+        spawnTimer = spawnInterval * (0.75 + Math.random() * 0.5);
+        spawnItem();
+      }
+
+      const pp = ssScreenPos(playerPos);
+      for (let i = fallingItems.length - 1; i >= 0; i--) {
+        const fi = fallingItems[i];
+        fi.y += fi.vy * dt;
+        const landY = ssY(fi.x) - SS_THICK / 2;
+        if (fi.y >= landY) {
+          const np = normPos(fi.x);
+          if (Math.abs(np) > 1.0) { fallingItems.splice(i, 1); continue; }
+          if (Math.abs(fi.x - pp.x) < PICK_RADIUS) {
+            // Player catches it
+            playerWeight += fi.weight;
+            weightEl.textContent = playerWeight;
+            if (fi.bonus) {
+              bonusScore += fi.bonus;
+              addEffect(fi.x, landY - 28, '\u2B50+' + fi.bonus, '#fff176');
+            } else {
+              addEffect(fi.x, landY - 28, 'GET +' + fi.weight + 'kg', '#a5d6a7');
+            }
+          } else {
+            // Fixed on seesaw board
+            if (fixedItems.length >= 10) fixedItems.shift();
+            fixedItems.push({ pos: np, weight: fi.weight, emoji: fi.emoji });
+            addEffect(fi.x, landY - 20, '\uD83D\uDCA5', '#ff8a65');
+          }
+          fallingItems.splice(i, 1);
+        }
+      }
+
+      for (let i = effects.length - 1; i >= 0; i--) {
+        effects[i].life -= dt * 1.4;
+        if (effects[i].life <= 0) effects.splice(i, 1);
+      }
+    }
+
+    // ── Render ───────────────────────────────────────────────
+    function render() {
+      const danger = Math.min(1, Math.abs(angle) / WARN_ANGLE);
+
+      // Sky (shifts orange/red when dangerous)
+      const skyGrad = ctx.createLinearGradient(0, 0, 0, CH);
+      const sr = Math.round(135 + danger * 90);
+      const sg = Math.round(206 - danger * 60);
+      const sb = Math.round(235 - danger * 100);
+      skyGrad.addColorStop(0, 'rgb(' + sr + ',' + sg + ',' + sb + ')');
+      skyGrad.addColorStop(1, '#fffde7');
+      ctx.fillStyle = skyGrad;
+      ctx.fillRect(0, 0, CW, CH);
+
+      // Ground
+      ctx.fillStyle = '#66bb6a'; ctx.fillRect(0, PIVOT_Y + 28, CW, CH);
+      ctx.fillStyle = '#388e3c'; ctx.fillRect(0, PIVOT_Y + 28, CW, 10);
+
+      // Shadow / hint lines for falling items
+      ctx.save();
+      const pp = ssScreenPos(playerPos);
+      for (const fi of fallingItems) {
+        const np = normPos(fi.x);
+        if (Math.abs(np) > 1.0) continue;
+        const landY = ssY(fi.x) - SS_THICK / 2 - 4;
+        const close = Math.abs(fi.x - pp.x) < PICK_RADIUS;
+        ctx.strokeStyle = close ? 'rgba(60,200,60,0.45)' : 'rgba(200,60,60,0.3)';
+        ctx.lineWidth = 2; ctx.setLineDash([4, 4]);
+        ctx.beginPath(); ctx.moveTo(fi.x, fi.y + 20); ctx.lineTo(fi.x, landY); ctx.stroke();
+        ctx.fillStyle = close ? 'rgba(60,200,60,0.55)' : 'rgba(200,60,60,0.45)';
+        ctx.beginPath(); ctx.arc(fi.x, landY, 7, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.setLineDash([]); ctx.restore();
+
+      // Pivot support triangle
+      ctx.fillStyle = '#5d4037';
+      ctx.beginPath();
+      ctx.moveTo(PIVOT_X, PIVOT_Y + 2);
+      ctx.lineTo(PIVOT_X - 28, PIVOT_Y + 38);
+      ctx.lineTo(PIVOT_X + 28, PIVOT_Y + 38);
+      ctx.closePath(); ctx.fill();
+      ctx.fillStyle = '#8d6e63'; ctx.fillRect(PIVOT_X - 42, PIVOT_Y + 36, 84, 12);
+
+      // Seesaw plank (rotated)
+      ctx.save();
+      ctx.translate(PIVOT_X, PIVOT_Y); ctx.rotate(angle);
+      ctx.fillStyle = danger > 0.7 ? '#bf360c' : danger > 0.35 ? '#e65100' : '#6d4c41';
+      rrect(-SS_HALF, -SS_THICK / 2, SS_HALF * 2, SS_THICK, 8); ctx.fill();
+      ctx.strokeStyle = 'rgba(255,255,255,0.18)'; ctx.lineWidth = 2;
+      for (let rx = -SS_HALF + 25; rx < SS_HALF; rx += 38) {
+        ctx.beginPath(); ctx.moveTo(rx, -SS_THICK / 2 + 4); ctx.lineTo(rx, SS_THICK / 2 - 4); ctx.stroke();
+      }
+      ctx.fillStyle = '#4e342e';
+      ctx.fillRect(-SS_HALF, -SS_THICK / 2, 14, SS_THICK);
+      ctx.fillRect(SS_HALF - 14, -SS_THICK / 2, 14, SS_THICK);
+      ctx.restore();
+
+      // Pivot center dot
+      ctx.fillStyle = '#3e2723';
+      ctx.beginPath(); ctx.arc(PIVOT_X, PIVOT_Y, 7, 0, Math.PI * 2); ctx.fill();
+
+      // Fixed items on seesaw
+      for (const it of fixedItems) {
+        const sp = ssScreenPos(it.pos);
+        ctx.font = '24px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+        ctx.fillText(it.emoji, sp.x, sp.y - SS_THICK / 2 + 2);
+        ctx.font = 'bold 10px sans-serif'; ctx.fillStyle = '#5d4037';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(it.weight + 'kg', sp.x, sp.y - SS_THICK / 2 - 14);
+      }
+
+      // Player on seesaw
+      const pp2 = ssScreenPos(playerPos);
+      ctx.save();
+      ctx.translate(pp2.x, pp2.y - SS_THICK / 2 + 2); ctx.rotate(angle);
+      ctx.font = '36px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+      ctx.fillText('\uD83C\uDF5E', 0, 0);  // bread emoji
+      ctx.font = 'bold 11px sans-serif'; ctx.fillStyle = '#fff';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(playerWeight + 'kg', 0, -30);
+      ctx.restore();
+
+      // Falling items
+      for (const fi of fallingItems) {
+        ctx.globalAlpha = 0.18;
+        ctx.font = '28px serif'; ctx.textAlign = 'center'; ctx.textBaseline = 'bottom';
+        ctx.fillText(fi.emoji, fi.x + 3, fi.y + 3);
+        ctx.globalAlpha = 1;
+        ctx.fillText(fi.emoji, fi.x, fi.y);
+        ctx.font = 'bold 11px sans-serif'; ctx.fillStyle = '#5d4037';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(fi.weight + 'kg', fi.x, fi.y - 26);
+      }
+
+      // Float-up effects
+      for (const e of effects) {
+        ctx.globalAlpha = Math.max(0, e.life);
+        ctx.font = 'bold 14px "Hiragino Maru Gothic Pro", sans-serif';
+        ctx.fillStyle = e.color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(e.text, e.x, e.y - (1 - e.life) * 40);
+      }
+      ctx.globalAlpha = 1;
+
+      drawBalanceMeter();
+    }
+
+    function drawBalanceMeter() {
+      const mx = 26, my = CH - 60, mw = CW - 52, mh = 24, r = 12;
+
+      ctx.fillStyle = '#fff9c4'; rrect(mx, my, mw, mh, r); ctx.fill();
+
+      const dw = mw * 0.2;
+      ctx.fillStyle = '#ffcdd2'; rrect(mx, my, dw, mh, r); ctx.fill();
+      rrect(mx + mw - dw, my, dw, mh, r); ctx.fill();
+
+      const ww = mw * 0.15;
+      ctx.fillStyle = '#fff59d';
+      ctx.fillRect(mx + dw, my, ww, mh); ctx.fillRect(mx + mw - dw - ww, my, ww, mh);
+      ctx.fillStyle = '#c8e6c9';
+      ctx.fillRect(mx + dw + ww, my, mw - (dw + ww) * 2, mh);
+
+      ctx.strokeStyle = '#8d6e63'; ctx.lineWidth = 2.5;
+      rrect(mx, my, mw, mh, r); ctx.stroke();
+
+      ctx.strokeStyle = '#bdbdbd'; ctx.lineWidth = 1; ctx.setLineDash([3, 3]);
+      ctx.beginPath(); ctx.moveTo(mx + mw / 2, my + 3); ctx.lineTo(mx + mw / 2, my + mh - 3); ctx.stroke();
+      ctx.setLineDash([]);
+
+      const clampX = Math.max(mx + r, Math.min(mx + mw - r, mx + mw / 2 + (angle / MAX_ANGLE) * mw / 2));
+      ctx.fillStyle = Math.abs(angle) > WARN_ANGLE ? '#ef5350' : '#4caf50';
+      ctx.beginPath(); ctx.arc(clampX, my + mh / 2, r, 0, Math.PI * 2); ctx.fill();
+      ctx.strokeStyle = 'white'; ctx.lineWidth = 2.5;
+      ctx.beginPath(); ctx.arc(clampX, my + mh / 2, r, 0, Math.PI * 2); ctx.stroke();
+
+      ctx.font = 'bold 11px "Hiragino Maru Gothic Pro", sans-serif';
+      ctx.fillStyle = '#5d4037'; ctx.textAlign = 'center'; ctx.textBaseline = 'alphabetic';
+      ctx.fillText('\u2696 \u30D0\u30E9\u30F3\u30B9', mx + mw / 2, my + mh + 15);
+    }
+
+    // ── Game loop ─────────────────────────────────────────────
+    function gameLoop(now) {
+      const dt = Math.min((now - lastTime) / 1000, 0.05);
+      lastTime = now;
+      if (gameRunning) {
+        update(dt);
+        if (gameRunning) { render(); requestAnimationFrame(gameLoop); }
+      }
+    }
+
+    // ── Input ─────────────────────────────────────────────────
+    document.addEventListener('keydown', e => {
+      if (e.key === 'ArrowLeft'  || e.key === 'a' || e.key === 'A') keys.left  = true;
+      if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = true;
+      if ((e.key === ' ' || e.key === 'Enter') && !gameRunning) startGame();
+      if (['ArrowLeft', 'ArrowRight', ' '].includes(e.key)) e.preventDefault();
+    });
+    document.addEventListener('keyup', e => {
+      if (e.key === 'ArrowLeft'  || e.key === 'a' || e.key === 'A') keys.left  = false;
+      if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false;
+    });
+
+    const btnL = document.getElementById('btn-left');
+    const btnR = document.getElementById('btn-right');
+    btnL.addEventListener('pointerdown',  e => { e.preventDefault(); keys.left  = true; });
+    btnL.addEventListener('pointerup',    e => { e.preventDefault(); keys.left  = false; });
+    btnL.addEventListener('pointerleave', ()  => { keys.left  = false; });
+    btnR.addEventListener('pointerdown',  e => { e.preventDefault(); keys.right = true; });
+    btnR.addEventListener('pointerup',    e => { e.preventDefault(); keys.right = false; });
+    btnR.addEventListener('pointerleave', ()  => { keys.right = false; });
+    startBtn.addEventListener('click', startGame);
+
+    resetGame();
+    render();
+  </script>
+</body>
+</html>
