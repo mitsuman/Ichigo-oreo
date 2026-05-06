@@ -1,0 +1,492 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🍍 パイナップルオレオクイズ 🍪</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: linear-gradient(160deg, #fff9c4 0%, #fffde7 50%, #f0fff0 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      min-height: 100vh;
+      padding: 16px 8px 24px;
+      font-family: "Hiragino Maru Gothic Pro", "Rounded Mplus 1c", sans-serif;
+      user-select: none;
+      touch-action: manipulation;
+    }
+
+    /* ナビ */
+    #game-nav {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    #game-nav a {
+      padding: 7px 18px;
+      border-radius: 50px;
+      text-decoration: none;
+      font-size: 0.95rem;
+      font-weight: bold;
+      border: 3px solid transparent;
+      background: rgba(255,255,255,0.75);
+      color: #555;
+      transition: transform 0.1s;
+    }
+    #game-nav a:hover { transform: scale(1.05); }
+    #game-nav a.active {
+      background: #f9a825;
+      color: white;
+      border-color: #f57f17;
+    }
+    #game-nav a:not(.active):hover {
+      background: #fffde7;
+      color: #f9a825;
+      border-color: #f9a825;
+    }
+
+    h1 {
+      font-size: 1.9rem;
+      color: #e65100;
+      text-shadow: 2px 2px 0 #fff;
+      margin-bottom: 10px;
+      letter-spacing: 2px;
+      text-align: center;
+    }
+
+    /* HUD */
+    #hud {
+      display: flex;
+      gap: 24px;
+      font-size: 1.15rem;
+      font-weight: bold;
+      color: #4e342e;
+      margin-bottom: 12px;
+    }
+    #lives-display { color: #e53935; }
+    #q-counter    { color: #1565c0; }
+
+    /* タイマーバー */
+    #timer-wrap {
+      width: 480px;
+      max-width: 96vw;
+      height: 16px;
+      background: #ffe082;
+      border-radius: 8px;
+      overflow: hidden;
+      margin-bottom: 14px;
+      border: 2px solid #ffb300;
+    }
+    #timer-bar {
+      height: 100%;
+      background: linear-gradient(90deg, #ff6f00, #ffca28);
+      border-radius: 8px;
+      transition: width 0.1s linear;
+    }
+
+    /* クイズカード */
+    #quiz-card {
+      width: 480px;
+      max-width: 96vw;
+      background: white;
+      border-radius: 24px;
+      border: 5px solid #ffb300;
+      box-shadow: 0 8px 32px #ffb30044;
+      padding: 24px 20px 28px;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+      min-height: 340px;
+    }
+
+    /* マスコット */
+    #mascot {
+      font-size: 3.6rem;
+      animation: bounce 1.2s ease-in-out infinite;
+    }
+    @keyframes bounce {
+      0%, 100% { transform: translateY(0); }
+      50%       { transform: translateY(-10px); }
+    }
+    #mascot.correct { animation: mascotHappy 0.6s ease-out; }
+    @keyframes mascotHappy {
+      0%   { transform: scale(1) rotate(0); }
+      30%  { transform: scale(1.4) rotate(15deg); }
+      60%  { transform: scale(1.4) rotate(-15deg); }
+      100% { transform: scale(1) rotate(0); }
+    }
+    #mascot.wrong { animation: mascotSad 0.5s ease-out; }
+    @keyframes mascotSad {
+      0%, 100% { transform: translateX(0); }
+      20%      { transform: translateX(-12px); }
+      40%      { transform: translateX(12px); }
+      60%      { transform: translateX(-8px); }
+      80%      { transform: translateX(8px); }
+    }
+
+    /* 問題文 */
+    #question-visual {
+      font-size: 3rem;
+      text-align: center;
+      line-height: 1.4;
+      min-height: 60px;
+    }
+    #question-text {
+      font-size: 1.4rem;
+      color: #4e342e;
+      text-align: center;
+      line-height: 1.5;
+    }
+
+    /* 選択肢ボタン */
+    #choices {
+      display: flex;
+      gap: 16px;
+      flex-wrap: wrap;
+      justify-content: center;
+      width: 100%;
+    }
+    .choice-btn {
+      flex: 1 1 120px;
+      max-width: 200px;
+      min-height: 90px;
+      font-size: 2.4rem;
+      background: #fffde7;
+      border: 4px solid #ffb300;
+      border-radius: 20px;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 4px;
+      transition: transform 0.1s;
+      box-shadow: 0 4px 10px #ffb30033;
+    }
+    .choice-btn span.label {
+      font-size: 1rem;
+      color: #6d4c41;
+      font-weight: bold;
+    }
+    .choice-btn:active   { transform: scale(0.93); }
+    .choice-btn:hover    { background: #fff8e1; transform: scale(1.04); }
+    .choice-btn.correct  { background: #c8e6c9; border-color: #388e3c; }
+    .choice-btn.wrong    { background: #ffcdd2; border-color: #e53935; }
+    .choice-btn:disabled { cursor: default; transform: none; }
+
+    /* フィードバック */
+    #feedback {
+      font-size: 1.6rem;
+      font-weight: bold;
+      min-height: 2rem;
+      text-align: center;
+    }
+    #feedback.ok  { color: #2e7d32; }
+    #feedback.ng  { color: #c62828; }
+
+    /* オーバーレイ */
+    #overlay {
+      position: fixed;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255,255,255,0.92);
+      gap: 14px;
+      z-index: 100;
+    }
+    #overlay h2 { font-size: 2.2rem; color: #e65100; }
+    #overlay p  { font-size: 1.2rem; color: #555; text-align: center; }
+    #overlay .big-emoji { font-size: 4rem; }
+
+    #start-btn {
+      padding: 16px 52px;
+      font-size: 1.5rem;
+      background: #f9a825;
+      color: white;
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      box-shadow: 0 4px 14px #f9a82588;
+      font-family: inherit;
+      transition: transform 0.1s;
+    }
+    #start-btn:active { transform: scale(0.95); }
+
+    .result-stars { font-size: 2rem; letter-spacing: 4px; }
+  </style>
+</head>
+<body>
+  <nav id="game-nav">
+    <a href="index.html">🍓 イチゴオレオ</a>
+    <a href="index2.html">🍈 メロンオレオ</a>
+    <a href="index3.html" class="active">🍍 パイナップルオレオ</a>
+  </nav>
+
+  <h1>🍍 パイナップルオレオクイズ 🍪</h1>
+
+  <div id="hud">
+    <span id="q-counter">もんだい：<span id="q-num">1</span> / <span id="q-total">10</span></span>
+    <span>スコア：<span id="score">0</span></span>
+    <span id="lives-display">❤️<span id="lives">3</span></span>
+  </div>
+
+  <div id="timer-wrap"><div id="timer-bar" style="width:100%"></div></div>
+
+  <div id="quiz-card">
+    <div id="mascot">🍍</div>
+    <div id="question-visual"></div>
+    <div id="question-text">もんだいをよんでね！</div>
+    <div id="choices"></div>
+    <div id="feedback"></div>
+  </div>
+
+  <!-- オーバーレイ -->
+  <div id="overlay">
+    <div class="big-emoji">🍍</div>
+    <h2 id="overlay-title">パイナップルオレオクイズ！</h2>
+    <p id="overlay-msg">かんたんなもんだいに　こたえよう！</p>
+    <p style="font-size:1rem; color:#888;">ぜんぶで10もん　チャレンジ！</p>
+    <button id="start-btn">▶ はじめる！</button>
+  </div>
+
+  <script>
+    // ── 問題データ ──────────────────────────────────
+    // type: 'pick' = 正解1つを選ぶ2択
+    // q: 質問文, visual: 大きく見せる絵文字, choices: [{emoji, label, correct}]
+    const ALL_QUESTIONS = [
+      // フルーツ識別
+      { visual:'', q:'パイナップルは　どれ？',
+        choices:[{e:'🍍',l:'パイナップル',ok:true},{e:'🍇',l:'ブドウ',ok:false}] },
+      { visual:'', q:'りんごは　どれ？',
+        choices:[{e:'🍎',l:'リンゴ',ok:true},{e:'🍌',l:'バナナ',ok:false}] },
+      { visual:'', q:'いちごは　どれ？',
+        choices:[{e:'🍓',l:'イチゴ',ok:true},{e:'🍊',l:'ミカン',ok:false}] },
+      { visual:'', q:'スイカは　どれ？',
+        choices:[{e:'🍉',l:'スイカ',ok:true},{e:'🍑',l:'モモ',ok:false}] },
+      // 数える
+      { visual:'🍍🍍🍍', q:'パイナップルは　いくつ？',
+        choices:[{e:'２',l:'に',ok:false},{e:'３',l:'さん',ok:true}] },
+      { visual:'⭐⭐', q:'ほしは　いくつ？',
+        choices:[{e:'２',l:'に',ok:true},{e:'４',l:'し',ok:false}] },
+      { visual:'🍪🍪🍪🍪', q:'オレオは　いくつ？',
+        choices:[{e:'３',l:'さん',ok:false},{e:'４',l:'し',ok:true}] },
+      { visual:'🐱🐱🐱🐱🐱', q:'ねこは　いくつ？',
+        choices:[{e:'４',l:'し',ok:false},{e:'５',l:'ご',ok:true}] },
+      // 色
+      { visual:'🌹', q:'バラは　なにいろ？',
+        choices:[{e:'🔴',l:'あか',ok:true},{e:'🔵',l:'あお',ok:false}] },
+      { visual:'🍋', q:'レモンは　なにいろ？',
+        choices:[{e:'🟡',l:'きいろ',ok:true},{e:'🟢',l:'みどり',ok:false}] },
+      { visual:'🌊', q:'うみは　なにいろ？',
+        choices:[{e:'🔵',l:'あお',ok:true},{e:'🟠',l:'オレンジ',ok:false}] },
+      // 動物
+      { visual:'🐱', q:'「ニャー」と　なくのは？',
+        choices:[{e:'🐱',l:'ねこ',ok:true},{e:'🐶',l:'いぬ',ok:false}] },
+      { visual:'🐶', q:'「ワン！」と　なくのは？',
+        choices:[{e:'🐱',l:'ねこ',ok:false},{e:'🐶',l:'いぬ',ok:true}] },
+      { visual:'', q:'おおきいのは　どっち？',
+        choices:[{e:'🐘',l:'ゾウ',ok:true},{e:'🐭',l:'ネズミ',ok:false}] },
+      { visual:'', q:'そらを　とぶのは？',
+        choices:[{e:'✈️',l:'ひこうき',ok:true},{e:'🚗',l:'くるま',ok:false}] },
+      // 食べ物
+      { visual:'', q:'あまくて　つめたい　たべものは？',
+        choices:[{e:'🍦',l:'アイス',ok:true},{e:'🍜',l:'ラーメン',ok:false}] },
+      { visual:'', q:'たまごから　うまれるのは？',
+        choices:[{e:'🐔',l:'にわとり',ok:true},{e:'🐷',l:'ブタ',ok:false}] },
+      { visual:'', q:'パンを　やくのは？',
+        choices:[{e:'🍞',l:'パン屋',ok:false},{e:'🔥',l:'ひ（オーブン）',ok:true}] },
+      // 生活
+      { visual:'', q:'ねるときに　つかうのは？',
+        choices:[{e:'🛏️',l:'ベッド',ok:true},{e:'🚿',l:'シャワー',ok:false}] },
+      { visual:'', q:'あめのひに　つかうのは？',
+        choices:[{e:'☂️',l:'かさ',ok:true},{e:'🕶️',l:'サングラス',ok:false}] },
+    ];
+
+    const TOTAL_Q = 10;         // 1ゲームで出す問題数
+    const TIME_LIMIT = 8;       // 秒
+
+    let score      = 0;
+    let lives      = 3;
+    let qIndex     = 0;         // 現在の問題インデックス（選択済みリストの中）
+    let activeQ    = [];        // 今回選ばれた問題リスト
+    let gameRunning = false;
+    let timerInterval = null;
+    let timeLeft   = TIME_LIMIT;
+    let answering  = false;
+
+    const overlay      = document.getElementById('overlay');
+    const overlayTitle = document.getElementById('overlay-title');
+    const overlayMsg   = document.getElementById('overlay-msg');
+    const startBtn     = document.getElementById('start-btn');
+    const scoreEl      = document.getElementById('score');
+    const livesEl      = document.getElementById('lives');
+    const qNumEl       = document.getElementById('q-num');
+    const qTotalEl     = document.getElementById('q-total');
+    const mascot       = document.getElementById('mascot');
+    const qVisual      = document.getElementById('question-visual');
+    const qText        = document.getElementById('question-text');
+    const choicesEl    = document.getElementById('choices');
+    const feedbackEl   = document.getElementById('feedback');
+    const timerBar     = document.getElementById('timer-bar');
+
+    function shuffle(arr) {
+      return [...arr].sort(() => Math.random() - 0.5);
+    }
+
+    function startGame() {
+      score  = 0;
+      lives  = 3;
+      qIndex = 0;
+      activeQ = shuffle(ALL_QUESTIONS).slice(0, TOTAL_Q);
+      scoreEl.textContent = '0';
+      livesEl.textContent = '3';
+      qTotalEl.textContent = TOTAL_Q;
+      overlay.style.display = 'none';
+      gameRunning = true;
+      showQuestion();
+    }
+
+    function showQuestion() {
+      if (qIndex >= activeQ.length) { endGame(); return; }
+
+      const q = activeQ[qIndex];
+      answering = false;
+      feedbackEl.textContent = '';
+      feedbackEl.className   = '';
+      qNumEl.textContent     = qIndex + 1;
+      mascot.className       = '';
+      qVisual.textContent    = q.visual || '';
+      qText.textContent      = q.q;
+
+      // ボタン生成（選択肢をシャッフル）
+      choicesEl.innerHTML = '';
+      shuffle(q.choices).forEach(c => {
+        const btn = document.createElement('button');
+        btn.className = 'choice-btn';
+        btn.innerHTML = `<span>${c.e}</span><span class="label">${c.l}</span>`;
+        btn.addEventListener('click', () => answer(btn, c.ok));
+        choicesEl.appendChild(btn);
+      });
+
+      // タイマー
+      timeLeft = TIME_LIMIT;
+      timerBar.style.width = '100%';
+      timerBar.style.background = 'linear-gradient(90deg, #ff6f00, #ffca28)';
+      clearInterval(timerInterval);
+      timerInterval = setInterval(() => {
+        timeLeft -= 0.1;
+        const pct = Math.max(0, timeLeft / TIME_LIMIT * 100);
+        timerBar.style.width = pct + '%';
+        if (pct < 30) timerBar.style.background = '#e53935';
+        if (timeLeft <= 0) {
+          clearInterval(timerInterval);
+          if (!answering) timeUp();
+        }
+      }, 100);
+    }
+
+    function answer(btn, isCorrect) {
+      if (answering) return;
+      answering = true;
+      clearInterval(timerInterval);
+
+      // 全ボタン無効化
+      choicesEl.querySelectorAll('.choice-btn').forEach(b => b.disabled = true);
+
+      if (isCorrect) {
+        btn.classList.add('correct');
+        score++;
+        scoreEl.textContent = score;
+        feedbackEl.textContent = '⭕ せいかい！ すごい！';
+        feedbackEl.className   = 'ok';
+        mascot.className       = 'correct';
+      } else {
+        btn.classList.add('wrong');
+        // 正解を光らせる
+        choicesEl.querySelectorAll('.choice-btn').forEach(b => {
+          if (!b.classList.contains('wrong')) b.classList.add('correct');
+        });
+        lives = Math.max(0, lives - 1);
+        livesEl.textContent    = lives;
+        feedbackEl.textContent = '❌ ざんねん！';
+        feedbackEl.className   = 'ng';
+        mascot.className       = 'wrong';
+        if (lives <= 0) {
+          setTimeout(endGame, 900);
+          return;
+        }
+      }
+
+      qIndex++;
+      setTimeout(showQuestion, 1100);
+    }
+
+    function timeUp() {
+      answering = true;
+      choicesEl.querySelectorAll('.choice-btn').forEach(b => {
+        b.disabled = true;
+        // 正解を光らせる
+        const label = b.querySelector('.label').textContent;
+        // 正解ボタンを探してハイライト（activeQ[qIndex].choicesのok:trueと照合）
+      });
+      // 正解ボタンを探す
+      const q = activeQ[qIndex];
+      const correctLabel = q.choices.find(c => c.ok).l;
+      choicesEl.querySelectorAll('.choice-btn').forEach(b => {
+        if (b.querySelector('.label').textContent === correctLabel) {
+          b.classList.add('correct');
+        }
+      });
+      lives = Math.max(0, lives - 1);
+      livesEl.textContent    = lives;
+      feedbackEl.textContent = '⏰ じかんきれ！';
+      feedbackEl.className   = 'ng';
+      mascot.className       = 'wrong';
+      timerBar.style.width   = '0%';
+      if (lives <= 0) {
+        setTimeout(endGame, 900);
+        return;
+      }
+      qIndex++;
+      setTimeout(showQuestion, 1100);
+    }
+
+    function endGame() {
+      clearInterval(timerInterval);
+      gameRunning = false;
+      const pct = Math.round(score / TOTAL_Q * 100);
+      let stars = '';
+      if (pct >= 90) stars = '⭐⭐⭐';
+      else if (pct >= 60) stars = '⭐⭐';
+      else stars = '⭐';
+
+      let msg = '';
+      if (pct >= 90) msg = 'やったー！かんぺき！🎉';
+      else if (pct >= 60) msg = 'よくできました！👏';
+      else msg = 'またちょうせんしてね！💪';
+
+      overlayTitle.textContent = `${stars} ${msg}`;
+      overlayMsg.innerHTML     = `せいかい：<strong>${score}</strong> / ${TOTAL_Q}もん<br>❤️のこり：${lives}`;
+      startBtn.textContent     = '▶ もういちど！';
+      overlay.style.display    = 'flex';
+    }
+
+    startBtn.addEventListener('click', startGame);
+
+    // キーボードサポート（1 or 2 キーで選択）
+    document.addEventListener('keydown', e => {
+      if (!gameRunning) { if (e.key === 'Enter' || e.key === ' ') startGame(); return; }
+      const btns = choicesEl.querySelectorAll('.choice-btn:not([disabled])');
+      if (e.key === '1' && btns[0]) btns[0].click();
+      if (e.key === '2' && btns[1]) btns[1].click();
+    });
+  </script>
+</body>
+</html>
