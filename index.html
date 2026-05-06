@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🍓 イチゴオレオレース 🍪</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: linear-gradient(180deg, #ffe0f0 0%, #fff5cc 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      font-family: "Rounded Mplus 1c", "Hiragino Maru Gothic Pro", sans-serif;
+      overflow: hidden;
+      user-select: none;
+    }
+
+    h1 {
+      font-size: 2.2rem;
+      color: #e8456a;
+      text-shadow: 2px 2px 0 #fff;
+      margin-bottom: 8px;
+      letter-spacing: 2px;
+    }
+
+    #score-board {
+      font-size: 1.4rem;
+      color: #7b4f00;
+      margin-bottom: 12px;
+      font-weight: bold;
+    }
+
+    #game-container {
+      position: relative;
+      width: 700px;
+      max-width: 98vw;
+      height: 260px;
+      background: linear-gradient(180deg, #b3e5fc 0%, #b3e5fc 55%, #a8e063 55%, #a8e063 75%, #8bc34a 75%);
+      border-radius: 24px;
+      border: 5px solid #e8456a;
+      overflow: hidden;
+      box-shadow: 0 8px 32px #f06292aa;
+    }
+
+    /* 雲 */
+    .cloud {
+      position: absolute;
+      top: 18px;
+      font-size: 2.4rem;
+      animation: cloudMove linear infinite;
+      opacity: 0.8;
+    }
+
+    @keyframes cloudMove {
+      from { left: 110%; }
+      to   { left: -15%; }
+    }
+
+    /* 地面ライン */
+    #ground-line {
+      position: absolute;
+      bottom: 64px;
+      left: 0; right: 0;
+      height: 4px;
+      background: #558b2f;
+      border-radius: 2px;
+    }
+
+    /* イチゴキャラ */
+    #player {
+      position: absolute;
+      left: 80px;
+      bottom: 68px;
+      font-size: 3.2rem;
+      line-height: 1;
+      transition: none;
+    }
+
+    #player.jump {
+      animation: jumpAnim 0.55s ease-out;
+    }
+
+    @keyframes jumpAnim {
+      0%   { transform: translateY(0); }
+      40%  { transform: translateY(-110px); }
+      100% { transform: translateY(0); }
+    }
+
+    /* オレオ障害物 */
+    .obstacle {
+      position: absolute;
+      bottom: 68px;
+      font-size: 2.8rem;
+      line-height: 1;
+    }
+
+    /* オーバーレイ（スタート・ゲームオーバー） */
+    #overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255,255,255,0.78);
+      border-radius: 20px;
+      gap: 14px;
+    }
+
+    #overlay h2 {
+      font-size: 2rem;
+      color: #e8456a;
+    }
+
+    #overlay p {
+      font-size: 1.1rem;
+      color: #555;
+    }
+
+    #start-btn {
+      padding: 16px 48px;
+      font-size: 1.5rem;
+      background: #e8456a;
+      color: white;
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px #f0629288;
+      transition: transform 0.1s;
+      font-family: inherit;
+    }
+
+    #start-btn:active { transform: scale(0.95); }
+
+    #hint {
+      margin-top: 16px;
+      font-size: 1.1rem;
+      color: #d84315;
+      font-weight: bold;
+      letter-spacing: 1px;
+    }
+  </style>
+</head>
+<body>
+  <h1>🍓 イチゴオレオレース 🍪</h1>
+  <div id="score-board">スコア：<span id="score">0</span>　さいこうき録：<span id="best">0</span></div>
+
+  <div id="game-container">
+    <!-- 雲（装飾） -->
+    <div class="cloud" style="animation-duration:9s; top:14px;">☁️</div>
+    <div class="cloud" style="animation-duration:13s; top:36px; animation-delay:-5s; font-size:1.8rem;">☁️</div>
+    <div class="cloud" style="animation-duration:17s; top:10px; animation-delay:-9s; font-size:2rem;">☁️</div>
+
+    <div id="ground-line"></div>
+
+    <!-- プレイヤー：イチゴ -->
+    <div id="player">🍓</div>
+
+    <!-- オーバーレイ -->
+    <div id="overlay">
+      <h2 id="overlay-title">🍓 イチゴオレオレース！</h2>
+      <p id="overlay-msg">オレオをよけて　どこまでいけるかな？</p>
+      <button id="start-btn">▶ スタート！</button>
+    </div>
+  </div>
+
+  <div id="hint">スペースキー or タップで　ジャンプ！🌟</div>
+
+  <script>
+    const player    = document.getElementById('player');
+    const overlay   = document.getElementById('overlay');
+    const scoreEl   = document.getElementById('score');
+    const bestEl    = document.getElementById('best');
+    const startBtn  = document.getElementById('start-btn');
+    const overlayTitle = document.getElementById('overlay-title');
+    const overlayMsg   = document.getElementById('overlay-msg');
+    const container = document.getElementById('game-container');
+
+    const GROUND_Y  = 68;   // bottom offset of player (px)
+    const PLAYER_W  = 48;
+    const PLAYER_H  = 52;
+    const OBS_W     = 44;
+    const OBS_H     = 44;
+
+    let score = 0;
+    let best  = 0;
+    let gameRunning = false;
+    let obstacles   = [];
+    let animFrame;
+    let lastTime    = 0;
+    let speed       = 220;   // px per second
+    let spawnTimer  = 0;
+    let spawnInterval = 1.8; // seconds
+    let isJumping   = false;
+    let jumpLocked  = false;
+
+    // オレオの代わりに使う絵文字（バリエーション）
+    const OREO_EMOJIS = ['🍪', '🍩', '🍫'];
+
+    function resetGame() {
+      score = 0;
+      speed = 220;
+      spawnTimer = 0;
+      spawnInterval = 1.8;
+      isJumping = false;
+      jumpLocked = false;
+      scoreEl.textContent = '0';
+      // 既存障害物を削除
+      obstacles.forEach(o => o.el.remove());
+      obstacles = [];
+      player.style.bottom = GROUND_Y + 'px';
+      player.classList.remove('jump');
+    }
+
+    function startGame() {
+      resetGame();
+      overlay.style.display = 'none';
+      gameRunning = true;
+      lastTime = performance.now();
+      animFrame = requestAnimationFrame(gameLoop);
+    }
+
+    function gameOver() {
+      gameRunning = false;
+      cancelAnimationFrame(animFrame);
+      if (score > best) {
+        best = score;
+        bestEl.textContent = best;
+      }
+      overlayTitle.textContent = 'ざんねん！🌟';
+      overlayMsg.textContent   = `スコア：${score}　さいこうき録：${best}`;
+      startBtn.textContent     = '▶ もういちど！';
+      overlay.style.display    = 'flex';
+    }
+
+    function spawnObstacle() {
+      const el = document.createElement('div');
+      el.className = 'obstacle';
+      const emoji = OREO_EMOJIS[Math.floor(Math.random() * OREO_EMOJIS.length)];
+      el.textContent = emoji;
+      // たまに2段積み
+      const double = Math.random() < 0.25 && score > 10;
+      if (double) {
+        el.style.fontSize = '2.4rem';
+        const el2 = document.createElement('span');
+        el2.textContent = '\n' + emoji;
+        el2.style.display = 'block';
+        el.appendChild(el2);
+      }
+      el.style.left = container.offsetWidth + 'px';
+      container.appendChild(el);
+      obstacles.push({ el, x: container.offsetWidth, double });
+    }
+
+    function jump() {
+      if (!gameRunning) return;
+      if (isJumping) return;
+      isJumping = true;
+      player.classList.remove('jump');
+      void player.offsetWidth; // reflow
+      player.classList.add('jump');
+      setTimeout(() => {
+        isJumping = false;
+        player.classList.remove('jump');
+      }, 550);
+    }
+
+    function getPlayerRect() {
+      const px = 80;
+      const py = GROUND_Y;
+      // ジャンプ中は擬似的なY計算（CSS animationと合わせる）
+      let jumpOffset = 0;
+      if (isJumping) {
+        // 0→40%→100% of 550ms
+        // ピーク高さ110px。簡易：sin近似
+        const elapsed = performance.now() - jumpStart;
+        const t = Math.min(elapsed / 550, 1);
+        jumpOffset = Math.sin(t * Math.PI) * 110;
+      }
+      return {
+        left:   px,
+        right:  px + PLAYER_W,
+        bottom: py + jumpOffset,
+        top:    py + jumpOffset + PLAYER_H,
+      };
+    }
+
+    let jumpStart = 0;
+    const _origJump = jump;
+    window.jump = function() {
+      if (!gameRunning) return;
+      if (isJumping) return;
+      jumpStart = performance.now();
+      isJumping = true;
+      player.classList.remove('jump');
+      void player.offsetWidth;
+      player.classList.add('jump');
+      setTimeout(() => {
+        isJumping = false;
+        player.classList.remove('jump');
+      }, 550);
+    };
+
+    function gameLoop(now) {
+      const dt = Math.min((now - lastTime) / 1000, 0.1);
+      lastTime = now;
+
+      // スコア加算（時間ベース）
+      score += Math.floor(dt * 10);
+      scoreEl.textContent = score;
+
+      // 難易度上昇
+      speed = 220 + score * 0.8;
+      spawnInterval = Math.max(0.9, 1.8 - score * 0.004);
+
+      // 障害物スポーン
+      spawnTimer += dt;
+      if (spawnTimer >= spawnInterval) {
+        spawnTimer = 0;
+        spawnObstacle();
+      }
+
+      // 障害物移動 & 当たり判定 & 削除
+      const pr = getPlayerRect();
+      const margin = 10; // 当たり判定を少し甘く（子ども向け）
+
+      for (let i = obstacles.length - 1; i >= 0; i--) {
+        const obs = obstacles[i];
+        obs.x -= speed * dt;
+        obs.el.style.left = obs.x + 'px';
+
+        // 画面外に出たら削除
+        if (obs.x < -60) {
+          obs.el.remove();
+          obstacles.splice(i, 1);
+          continue;
+        }
+
+        // 衝突判定（甘め）
+        const obsLeft   = obs.x + margin;
+        const obsRight  = obs.x + OBS_W - margin;
+        const obsBottom = GROUND_Y;
+        const obsTop    = GROUND_Y + (obs.double ? OBS_H * 1.8 : OBS_H) - margin;
+
+        const hx = pr.right - margin > obsLeft && pr.left + margin < obsRight;
+        const hy = pr.bottom < obsTop && pr.bottom + PLAYER_H - margin > obsBottom;
+
+        if (hx && hy) {
+          // ヒット！
+          obs.el.style.filter = 'brightness(3)';
+          setTimeout(gameOver, 100);
+          return;
+        }
+      }
+
+      if (gameRunning) animFrame = requestAnimationFrame(gameLoop);
+    }
+
+    // 入力
+    document.addEventListener('keydown', e => {
+      if (e.code === 'Space' || e.key === ' ' || e.key === 'ArrowUp') {
+        e.preventDefault();
+        if (!gameRunning) { startGame(); return; }
+        jump();
+      }
+    });
+
+    container.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      if (!gameRunning) { startGame(); return; }
+      jump();
+    });
+
+    document.body.addEventListener('pointerdown', e => {
+      if (!gameRunning && overlay.style.display !== 'none') {
+        // startBtn以外の場所タップでも開始
+      }
+    });
+
+    startBtn.addEventListener('click', startGame);
+
+    bestEl.textContent = best;
+  </script>
+</body>
+</html>
