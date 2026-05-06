@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🍌 バナナオレオアスレチック 🍪</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: linear-gradient(160deg, #e8f5e9 0%, #fffde7 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 12px 8px 16px;
+      min-height: 100vh;
+      font-family: "Hiragino Maru Gothic Pro", "Rounded Mplus 1c", sans-serif;
+      user-select: none;
+      touch-action: none;
+    }
+
+    #game-nav {
+      display: flex; gap: 8px; margin-bottom: 10px;
+      flex-wrap: wrap; justify-content: center;
+    }
+    #game-nav a {
+      padding: 6px 13px; border-radius: 50px; text-decoration: none;
+      font-size: 0.85rem; font-weight: bold; border: 3px solid transparent;
+      background: rgba(255,255,255,0.75); color: #555; transition: transform 0.1s;
+    }
+    #game-nav a:hover { transform: scale(1.05); }
+    #game-nav a.active { background: #ff8f00; color: #fff; border-color: #e65100; }
+    #game-nav a:not(.active):hover { background: #fff8e1; color: #ff8f00; border-color: #ff8f00; }
+
+    h1 {
+      font-size: 1.7rem; color: #e65100;
+      text-shadow: 2px 2px 0 #fff;
+      margin-bottom: 8px; text-align: center;
+    }
+
+    #hud {
+      display: flex; gap: 18px; font-size: 1.1rem;
+      font-weight: bold; color: #4e342e; margin-bottom: 8px;
+    }
+    #lives-disp { color: #e53935; }
+
+    #canvas-wrap { position: relative; }
+    canvas {
+      display: block; border-radius: 20px;
+      border: 4px solid #ff8f00;
+      box-shadow: 0 6px 24px #ff8f0044;
+    }
+
+    #overlay {
+      position: absolute; inset: 0;
+      display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: rgba(255,255,255,0.91);
+      border-radius: 17px; gap: 12px; z-index: 10;
+    }
+    #overlay h2 { font-size: 1.85rem; color: #e65100; text-align: center; line-height: 1.3; }
+    #overlay p  { font-size: 1rem; color: #555; text-align: center; line-height: 1.9; }
+    #start-btn {
+      padding: 14px 48px; font-size: 1.4rem;
+      background: #ff8f00; color: #fff; border: none;
+      border-radius: 50px; cursor: pointer; font-family: inherit;
+      box-shadow: 0 4px 12px #ff8f0066; transition: transform 0.1s;
+    }
+    #start-btn:active { transform: scale(0.95); }
+
+    #touch-controls { display: flex; gap: 20px; margin-top: 10px; }
+    .tbtn {
+      width: 100px; height: 64px; font-size: 2rem;
+      background: rgba(255,255,255,0.85); border: 3px solid #ff8f00;
+      border-radius: 16px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+    }
+    .tbtn:active { background: #fff3e0; }
+    #hint { margin-top: 8px; font-size: 0.95rem; color: #bf360c; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <nav id="game-nav">
+    <a href="index.html">🍓 イチゴオレオ</a>
+    <a href="index2.html">🍈 メロンオレオ</a>
+    <a href="index3.html">🍍 パイナップルオレオ</a>
+    <a href="index4.html" class="active">🍌 バナナオレオ</a>
+  </nav>
+
+  <h1>🍌 バナナオレオアスレチック 🍪</h1>
+
+  <div id="hud">
+    <span>スコア：<span id="score">0</span></span>
+    <span>さいこう：<span id="best">0</span></span>
+    <span id="lives-disp">❤️<span id="lives">3</span></span>
+  </div>
+
+  <div id="canvas-wrap">
+    <canvas id="canvas" width="400" height="520"></canvas>
+    <div id="overlay">
+      <div style="font-size:3.2rem">🍌</div>
+      <h2 id="ov-title">バナナオレオ<br>アスレチック！</h2>
+      <p id="ov-msg">
+        🟢 みどりのだい → ジャンプ！<br>
+        🟡 きいろのだい → バナナ🍌 GET！<br>
+        🟫 くらいだい 🍪 → きけん！さけてね！
+      </p>
+      <button id="start-btn">▶ はじめる！</button>
+    </div>
+  </div>
+
+  <div id="touch-controls">
+    <div class="tbtn" id="btn-left">◀</div>
+    <div class="tbtn" id="btn-right">▶</div>
+  </div>
+  <div id="hint">← → キー または ボタンで うごかそう！🍌</div>
+
+  <script>
+    const canvas   = document.getElementById('canvas');
+    const ctx      = canvas.getContext('2d');
+    const CW       = canvas.width;   // 400
+    const CH       = canvas.height;  // 520
+
+    // ── physics ──────────────────────────────────────────────
+    const GRAVITY  = 1300;   // px/s²
+    const JUMP_VY  = -680;   // px/s  (max jump height ~177px)
+    const P_SPEED  = 310;    // px/s horizontal
+    const INIT_Y   = 400;    // player world-Y at game start
+
+    // ── state ────────────────────────────────────────────────
+    let player, cameraY, minPlayerY;
+    let heightScore, bonusScore, score, best;
+    let lives, platforms, bananas, effects;
+    let topGenY, gameRunning, lastTime;
+    let keys = { left: false, right: false };
+    best = 0;
+
+    const scoreEl  = document.getElementById('score');
+    const bestEl   = document.getElementById('best');
+    const livesEl  = document.getElementById('lives');
+    const overlay  = document.getElementById('overlay');
+    const ovTitle  = document.getElementById('ov-title');
+    const ovMsg    = document.getElementById('ov-msg');
+    const startBtn = document.getElementById('start-btn');
+
+    // ── helpers ───────────────────────────────────────────────
+    function rrect(x, y, w, h, r) {
+      ctx.beginPath();
+      ctx.moveTo(x + r, y);
+      ctx.arcTo(x + w, y,     x + w, y + h, r);
+      ctx.arcTo(x + w, y + h, x,     y + h, r);
+      ctx.arcTo(x,     y + h, x,     y,     r);
+      ctx.arcTo(x,     y,     x + w, y,     r);
+      ctx.closePath();
+    }
+
+    function addEffect(wx, wy, text, color) {
+      effects.push({ wx, wy, text, color: color || '#fff700', life: 1.0 });
+    }
+
+    function loseLife() {
+      lives--;
+      livesEl.textContent = lives;
+      canvas.style.outline = '5px solid #e53935';
+      setTimeout(() => { canvas.style.outline = ''; }, 350);
+      if (lives <= 0) {
+        gameRunning = false;
+        setTimeout(endGame, 500);
+      }
+    }
+
+    // ── platform generation ───────────────────────────────────
+    function genPlatforms() {
+      const genUpTo = cameraY - 900;
+      while (topGenY > genUpTo) {
+        topGenY -= 80 + Math.random() * 60;
+        const w  = 70 + Math.random() * 100;
+        const x  = 10 + Math.random() * (CW - w - 20);
+        const dc = Math.min(0.3, 0.04 + heightScore * 0.003);
+        let type = 'normal';
+        const r  = Math.random();
+        if      (r < dc)          type = 'danger';
+        else if (r < dc + 0.22)   type = 'bonus';
+        platforms.push({ x, y: topGenY, w, h: 18, type, used: false });
+
+        // 危険台が出たら、同じY付近に必ず安全な台を1つ追加する
+        if (type === 'danger') {
+          const sw = 70 + Math.random() * 80;
+          // 危険台と重ならない位置を選ぶ（左右どちらか）
+          let sx;
+          if (x > CW / 2) {
+            sx = 10 + Math.random() * (x - sw - 20);  // 危険台より左
+          } else {
+            sx = x + w + 10 + Math.random() * (CW - x - w - sw - 20); // 危険台より右
+          }
+          sx = Math.max(10, Math.min(CW - sw - 10, sx));
+          const safeType = Math.random() < 0.3 ? 'bonus' : 'normal';
+          platforms.push({ x: sx, y: topGenY + (Math.random() * 20 - 10), w: sw, h: 18, type: safeType, used: false });
+          if (Math.random() < 0.4) {
+            bananas.push({ wx: sx + Math.random() * Math.max(10, sw - 34), wy: topGenY - 55, collected: false });
+          }
+        }
+
+        // 通常台の上にバナナ
+        if (type !== 'danger' && Math.random() < 0.35) {
+          bananas.push({
+            wx: x + Math.random() * Math.max(10, w - 34),
+            wy: topGenY - 55,
+            collected: false,
+          });
+        }
+      }
+    }
+
+    // ── init ─────────────────────────────────────────────────
+    function initGame() {
+      lives = 3; bonusScore = 0; heightScore = 0; score = 0;
+      cameraY = 0; minPlayerY = INIT_Y;
+      player = { x: CW / 2 - 18, y: INIT_Y, w: 36, h: 36, vx: 0, vy: 0 };
+      platforms = []; bananas = []; effects = [];
+      // Wide safe starting platform directly under player
+      platforms.push({
+        x: CW / 2 - 90,
+        y: INIT_Y + 36,  // platform top = player bottom
+        w: 180, h: 18, type: 'normal', used: false,
+      });
+      topGenY = INIT_Y;
+      genPlatforms();
+      scoreEl.textContent = '0';
+      livesEl.textContent = '3';
+    }
+
+    function startGame() {
+      initGame();
+      overlay.style.display = 'none';
+      gameRunning = true;
+      lastTime    = performance.now();
+      requestAnimationFrame(gameLoop);
+    }
+
+    function endGame() {
+      gameRunning = false;
+      if (score > best) { best = score; bestEl.textContent = best; }
+      const stars = score >= 50 ? '⭐⭐⭐' : score >= 25 ? '⭐⭐' : '⭐';
+      ovTitle.textContent = `${stars} ${score}てん！`;
+      ovMsg.innerHTML     = `たかさ：${heightScore}　バナナ：${bonusScore}<br>さいこう：${best}`;
+      startBtn.textContent = '▶ もういちど！';
+      overlay.style.display = 'flex';
+    }
+
+    // ── update ────────────────────────────────────────────────
+    function update(dt) {
+      player.vx  = keys.left ? -P_SPEED : keys.right ? P_SPEED : 0;
+      player.vy += GRAVITY * dt;
+      if (player.vy > 1200) player.vy = 1200;
+
+      const prevBottom = player.y + player.h;
+      player.x += player.vx * dt;
+      player.y += player.vy * dt;
+
+      // wrap horizontally
+      if (player.x + player.w < 0) player.x = CW;
+      if (player.x > CW)           player.x = -player.w;
+
+      // platform collision (only while falling)
+      if (player.vy > 0) {
+        const currBottom = player.y + player.h;
+        for (const p of platforms) {
+          if (player.x + player.w - 6 > p.x &&
+              player.x + 6 < p.x + p.w &&
+              prevBottom <= p.y + 4 &&
+              currBottom >= p.y) {
+            player.y = p.y - player.h;
+            if (p.type === 'danger') {
+              player.vy = JUMP_VY;  // 通常と同じ高さでバウンス（進めなくなるのを防ぐ）
+              if (!p.used) {
+                p.used = true;
+                addEffect(p.x + p.w / 2, p.y - 20, '💥 きけん！', '#ff5252');
+                loseLife();
+                if (!gameRunning) return;
+              }
+            } else {
+              player.vy = JUMP_VY;
+              if (p.type === 'bonus' && !p.used) {
+                p.used = true;
+                bonusScore += 3;
+                addEffect(p.x + p.w / 2, p.y - 20, '🍌 +3', '#ffeb3b');
+              }
+            }
+            break;
+          }
+        }
+      }
+
+      // collect floating bananas
+      for (const b of bananas) {
+        if (!b.collected &&
+            player.x + player.w - 4 > b.wx &&
+            player.x + 4 < b.wx + 30 &&
+            player.y + player.h - 4 > b.wy &&
+            player.y + 4 < b.wy + 30) {
+          b.collected = true;
+          bonusScore += 5;
+          addEffect(b.wx + 15, b.wy, '🍌 +5', '#fff176');
+        }
+      }
+
+      // decay effects
+      for (let i = effects.length - 1; i >= 0; i--) {
+        effects[i].life -= dt * 1.4;
+        if (effects[i].life <= 0) effects.splice(i, 1);
+      }
+
+      // camera: follow player in both directions (smooth)
+      const targetCam = player.y - CH * 0.42;
+      cameraY += (targetCam - cameraY) * Math.min(1, dt * 7);
+
+      // score
+      minPlayerY  = Math.min(minPlayerY, player.y);
+      heightScore = Math.max(0, Math.floor((INIT_Y - minPlayerY) / 8));
+      score       = heightScore + bonusScore;
+      scoreEl.textContent = score;
+
+      // prune off-screen objects — keep large buffer so falling back down still has platforms
+      const cut = cameraY + CH + 3500;
+      platforms = platforms.filter(p => p.y < cut);
+      bananas   = bananas.filter(b => b.wy < cut);
+
+      // generate platforms ahead
+      genPlatforms();
+
+      // player fell below screen
+      if (player.y - cameraY > CH + 60) {
+        addEffect(CW / 2, cameraY + CH - 50, '😵 おっこちた！', '#ff5252');
+        loseLife();
+        if (!gameRunning) return;
+        player.y  = cameraY + CH - 80;
+        player.x  = CW / 2 - 18;
+        player.vy = JUMP_VY;
+        player.vx = 0;
+      }
+    }
+
+    // ── render ────────────────────────────────────────────────
+    function render() {
+      // sky gradient (gets darker blue as you go higher)
+      const progress = Math.max(0, Math.min(1, -cameraY / 3000));
+      const skyR1 = Math.round(135 + progress * (30 - 135));
+      const skyG1 = Math.round(206 + progress * (60 - 206));
+      const skyB1 = Math.round(235 + progress * (90 - 235));
+      const grad  = ctx.createLinearGradient(0, 0, 0, CH);
+      grad.addColorStop(0, `rgb(${skyR1},${skyG1},${skyB1})`);
+      grad.addColorStop(1, '#dcedc8');
+      ctx.fillStyle = grad;
+      ctx.fillRect(0, 0, CW, CH);
+
+      // parallax clouds
+      ctx.font = '2.1rem serif';
+      const cloudConfigs = [[50, 0.18, 0], [220, 0.12, 180], [330, 0.22, 320]];
+      cloudConfigs.forEach(([cx, speed, offset]) => {
+        const scrolled = (-cameraY * speed + offset);
+        const cy = ((scrolled % (CH + 80)) + CH + 80) % (CH + 80) - 40;
+        ctx.globalAlpha = 0.15;
+        ctx.fillText('☁️', cx, cy);
+      });
+      ctx.globalAlpha = 1;
+
+      // platforms
+      ctx.textAlign = 'center';
+      for (const p of platforms) {
+        const cy = p.y - cameraY;
+        if (cy > CH + 30 || cy < -60) continue;
+
+        if (p.type === 'danger') {
+          ctx.fillStyle = '#3e2723';
+          rrect(p.x, cy, p.w, p.h, 7); ctx.fill();
+          ctx.fillStyle = '#bf360c';
+          ctx.fillRect(p.x + 4, cy + 3, p.w - 8, 5);
+          ctx.font = '17px serif';
+          ctx.fillText('🍪', p.x + p.w / 2, cy - 1);
+        } else if (p.type === 'bonus') {
+          ctx.fillStyle = '#fdd835';
+          rrect(p.x, cy, p.w, p.h, 7); ctx.fill();
+          ctx.fillStyle = '#f9a825';
+          ctx.fillRect(p.x + 4, cy + 3, p.w - 8, 5);
+        } else {
+          ctx.fillStyle = '#4caf50';
+          rrect(p.x, cy, p.w, p.h, 7); ctx.fill();
+          ctx.fillStyle = '#81c784';
+          ctx.fillRect(p.x + 4, cy + 3, p.w - 8, 5);
+        }
+      }
+
+      // floating bananas
+      ctx.font = '22px serif';
+      for (const b of bananas) {
+        if (b.collected) continue;
+        const cy = b.wy - cameraY;
+        if (cy > CH + 30 || cy < -60) continue;
+        ctx.fillText('🍌', b.wx + 15, cy + 22);
+      }
+
+      // player
+      const py = player.y - cameraY;
+      ctx.font = '32px serif';
+      ctx.textAlign = 'center';
+      ctx.fillText('🍌', player.x + player.w / 2, py + player.h);
+
+      // effects
+      for (const e of effects) {
+        const progress = 1 - e.life;
+        const ey = (e.wy - cameraY) - progress * 40;
+        ctx.globalAlpha = Math.max(0, e.life);
+        ctx.font = 'bold 15px "Hiragino Maru Gothic Pro", sans-serif';
+        ctx.textAlign = 'center';
+        ctx.fillStyle = e.color;
+        ctx.fillText(e.text, e.wx, ey);
+      }
+      ctx.globalAlpha = 1;
+
+      // height meter
+      const heightM = Math.floor((INIT_Y - minPlayerY) / 10);
+      if (heightM > 0) {
+        ctx.textAlign = 'right';
+        ctx.font = 'bold 13px sans-serif';
+        ctx.fillStyle = 'rgba(0,0,0,0.32)';
+        ctx.fillText(`↑ ${heightM}m`, CW - 8, 22);
+      }
+    }
+
+    // ── game loop ─────────────────────────────────────────────
+    function gameLoop(now) {
+      const dt = Math.min((now - lastTime) / 1000, 0.05);
+      lastTime  = now;
+      if (gameRunning) {
+        update(dt);
+        render();
+        requestAnimationFrame(gameLoop);
+      }
+    }
+
+    // ── input ─────────────────────────────────────────────────
+    document.addEventListener('keydown', e => {
+      if (e.key === 'ArrowLeft'  || e.key === 'a' || e.key === 'A') keys.left  = true;
+      if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = true;
+      if ((e.key === ' ' || e.key === 'Enter') && !gameRunning) startGame();
+      if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].includes(e.key))
+        e.preventDefault();
+    });
+    document.addEventListener('keyup', e => {
+      if (e.key === 'ArrowLeft'  || e.key === 'a' || e.key === 'A') keys.left  = false;
+      if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false;
+    });
+
+    const btnL = document.getElementById('btn-left');
+    const btnR = document.getElementById('btn-right');
+    btnL.addEventListener('pointerdown',  e => { e.preventDefault(); keys.left  = true; });
+    btnL.addEventListener('pointerup',    e => { e.preventDefault(); keys.left  = false; });
+    btnL.addEventListener('pointerleave', ()  => { keys.left  = false; });
+    btnR.addEventListener('pointerdown',  e => { e.preventDefault(); keys.right = true; });
+    btnR.addEventListener('pointerup',    e => { e.preventDefault(); keys.right = false; });
+    btnR.addEventListener('pointerleave', ()  => { keys.right = false; });
+
+    startBtn.addEventListener('click', startGame);
+
+    // initial static render
+    initGame();
+    render();
+  </script>
+</body>
+</html>
