@@ -1,0 +1,423 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>🍈 メロンオレオレース 🍪</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: linear-gradient(180deg, #c8f5c8 0%, #e0f7e0 60%, #fffde7 100%);
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      font-family: "Hiragino Maru Gothic Pro", "Rounded Mplus 1c", sans-serif;
+      overflow: hidden;
+      user-select: none;
+      touch-action: none;
+    }
+
+    h1 {
+      font-size: 2rem;
+      color: #2e7d32;
+      text-shadow: 2px 2px 0 #fff;
+      margin-bottom: 6px;
+      letter-spacing: 2px;
+    }
+
+    #hud {
+      display: flex;
+      gap: 32px;
+      font-size: 1.3rem;
+      color: #4e342e;
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+
+    #lives-display { color: #e53935; }
+
+    #game-container {
+      position: relative;
+      width: 480px;
+      max-width: 96vw;
+      height: 520px;
+      background: linear-gradient(180deg, #81d4fa 0%, #b2ebf2 40%, #a5d6a7 40%, #66bb6a 100%);
+      border-radius: 24px;
+      border: 5px solid #43a047;
+      overflow: hidden;
+      box-shadow: 0 8px 32px #66bb6a88;
+    }
+
+    /* 流れる雲 */
+    .cloud {
+      position: absolute;
+      font-size: 2rem;
+      opacity: 0.7;
+      animation: cloudDrift linear infinite;
+    }
+    @keyframes cloudDrift {
+      from { transform: translateX(0); }
+      to   { transform: translateX(-600px); }
+    }
+
+    /* 落下アイテム */
+    .item {
+      position: absolute;
+      font-size: 2.6rem;
+      line-height: 1;
+      pointer-events: none;
+    }
+
+    /* プレイヤー（バスケット） */
+    #player {
+      position: absolute;
+      bottom: 14px;
+      font-size: 3rem;
+      line-height: 1;
+      transition: left 0.08s linear;
+    }
+
+    /* 草の地面装飾 */
+    #ground-deco {
+      position: absolute;
+      bottom: 0;
+      left: 0; right: 0;
+      height: 52px;
+      background: #388e3c;
+      border-radius: 0 0 20px 20px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-around;
+      padding-top: 2px;
+      font-size: 1.6rem;
+    }
+
+    /* キャッチエフェクト */
+    .pop {
+      position: absolute;
+      font-size: 2rem;
+      pointer-events: none;
+      animation: popAnim 0.6s ease-out forwards;
+    }
+    @keyframes popAnim {
+      0%   { opacity: 1; transform: scale(1) translateY(0); }
+      100% { opacity: 0; transform: scale(1.8) translateY(-40px); }
+    }
+
+    /* オーバーレイ */
+    #overlay {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      background: rgba(255,255,255,0.82);
+      border-radius: 20px;
+      gap: 12px;
+    }
+
+    #overlay h2 {
+      font-size: 2rem;
+      color: #2e7d32;
+    }
+
+    #overlay p {
+      font-size: 1.1rem;
+      color: #555;
+    }
+
+    #start-btn {
+      padding: 16px 48px;
+      font-size: 1.5rem;
+      background: #43a047;
+      color: white;
+      border: none;
+      border-radius: 50px;
+      cursor: pointer;
+      box-shadow: 0 4px 12px #43a04788;
+      font-family: inherit;
+      transition: transform 0.1s;
+    }
+    #start-btn:active { transform: scale(0.95); }
+
+    #hint {
+      margin-top: 14px;
+      font-size: 1.05rem;
+      color: #1b5e20;
+      font-weight: bold;
+    }
+
+    /* タップボタン（スマホ） */
+    #touch-controls {
+      display: flex;
+      gap: 24px;
+      margin-top: 12px;
+    }
+    .touch-btn {
+      width: 90px;
+      height: 60px;
+      font-size: 2rem;
+      background: rgba(255,255,255,0.85);
+      border: 3px solid #43a047;
+      border-radius: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .touch-btn:active { background: #c8e6c9; }
+  </style>
+</head>
+<body>
+  <h1>🍈 メロンオレオレース 🍪</h1>
+  <div id="hud">
+    <span>スコア：<span id="score">0</span></span>
+    <span>さいこう：<span id="best">0</span></span>
+    <span id="lives-display">❤️<span id="lives">3</span></span>
+  </div>
+
+  <div id="game-container">
+    <!-- 雲 -->
+    <div class="cloud" style="top:18px; left:420px; animation-duration:12s;">☁️</div>
+    <div class="cloud" style="top:50px; left:300px; animation-duration:18s; animation-delay:-6s; font-size:1.4rem;">☁️</div>
+    <div class="cloud" style="top:28px; left:150px; animation-duration:22s; animation-delay:-10s;">☁️</div>
+
+    <div id="ground-deco">
+      <span>🌿</span><span>🌱</span><span>🌿</span><span>🌱</span><span>🌿</span>
+    </div>
+
+    <!-- プレイヤー：メロンを受けるかご -->
+    <div id="player">🧺</div>
+
+    <!-- オーバーレイ -->
+    <div id="overlay">
+      <h2 id="overlay-title">🍈 メロンオレオレース！</h2>
+      <p id="overlay-msg">メロンをキャッチして　オレオをよけよう！</p>
+      <button id="start-btn">▶ スタート！</button>
+    </div>
+  </div>
+
+  <div id="touch-controls">
+    <div class="touch-btn" id="btn-left">◀</div>
+    <div class="touch-btn" id="btn-right">▶</div>
+  </div>
+  <div id="hint">← → キー または ボタンで　うごかそう！🌟</div>
+
+  <script>
+    const playerEl   = document.getElementById('player');
+    const overlay    = document.getElementById('overlay');
+    const scoreEl    = document.getElementById('score');
+    const bestEl     = document.getElementById('best');
+    const livesEl    = document.getElementById('lives');
+    const startBtn   = document.getElementById('start-btn');
+    const overlayTitle = document.getElementById('overlay-title');
+    const overlayMsg   = document.getElementById('overlay-msg');
+    const container  = document.getElementById('game-container');
+    const btnLeft    = document.getElementById('btn-left');
+    const btnRight   = document.getElementById('btn-right');
+
+    const CONTAINER_W = 480;
+    const PLAYER_W    = 56;
+    const ITEM_W      = 46;
+    const ITEM_H      = 46;
+    const GROUND_H    = 52;
+    const CATCH_Y     = GROUND_H + 52; // アイテムがプレイヤーに届く高さ（bottom基準）
+
+    // メロン系・オレオ系の絵文字
+    const MELONS = ['🍈', '🍏', '🍀', '⭐', '🎁'];
+    const OREOS  = ['🍪', '🍩', '🍫', '❌'];
+
+    let score = 0;
+    let best  = 0;
+    let lives = 3;
+    let gameRunning = false;
+    let items = [];
+    let animFrame;
+    let lastTime = 0;
+    let spawnTimer = 0;
+    let spawnInterval = 1.6;
+    let fallSpeed = 160; // px/sec
+
+    let playerX = CONTAINER_W / 2 - PLAYER_W / 2;
+    const PLAYER_SPEED = 320; // px/sec
+
+    let keys = { left: false, right: false };
+
+    function resetGame() {
+      score = 0;
+      lives = 3;
+      spawnTimer = 0;
+      spawnInterval = 1.6;
+      fallSpeed = 160;
+      items.forEach(i => i.el.remove());
+      items = [];
+      scoreEl.textContent = '0';
+      livesEl.textContent = '3';
+      playerX = CONTAINER_W / 2 - PLAYER_W / 2;
+      playerEl.style.left = playerX + 'px';
+    }
+
+    function startGame() {
+      resetGame();
+      overlay.style.display = 'none';
+      gameRunning = true;
+      lastTime = performance.now();
+      animFrame = requestAnimationFrame(gameLoop);
+    }
+
+    function gameOver() {
+      gameRunning = false;
+      cancelAnimationFrame(animFrame);
+      if (score > best) {
+        best = score;
+        bestEl.textContent = best;
+      }
+      overlayTitle.textContent = 'ゲームオーバー！🍈';
+      overlayMsg.textContent   = `スコア：${score}　さいこう：${best}`;
+      startBtn.textContent     = '▶ もういちど！';
+      overlay.style.display    = 'flex';
+    }
+
+    function loseLife() {
+      lives--;
+      livesEl.textContent = lives;
+      // 画面を赤く点滅
+      container.style.outline = '6px solid #e53935';
+      setTimeout(() => container.style.outline = '', 300);
+      if (lives <= 0) {
+        setTimeout(gameOver, 150);
+        return true;
+      }
+      return false;
+    }
+
+    function spawnItem() {
+      const el = document.createElement('div');
+      el.className = 'item';
+      const isMelon = Math.random() < 0.6; // 60%メロン
+      const pool = isMelon ? MELONS : OREOS;
+      el.textContent = pool[Math.floor(Math.random() * pool.length)];
+      const x = Math.random() * (CONTAINER_W - ITEM_W - 20) + 10;
+      el.style.left = x + 'px';
+      el.style.top  = '-50px';
+      container.appendChild(el);
+      items.push({ el, x, y: -50, isMelon });
+    }
+
+    function spawnPop(x, y, text) {
+      const pop = document.createElement('div');
+      pop.className = 'pop';
+      pop.textContent = text;
+      pop.style.left = (x - 10) + 'px';
+      pop.style.bottom = y + 'px';
+      container.appendChild(pop);
+      setTimeout(() => pop.remove(), 600);
+    }
+
+    function gameLoop(now) {
+      const dt = Math.min((now - lastTime) / 1000, 0.1);
+      lastTime = now;
+
+      // スコア加算（1点/秒）
+      score += dt;
+      scoreEl.textContent = Math.floor(score);
+
+      // 難易度上昇
+      const s = Math.floor(score);
+      fallSpeed    = 160 + s * 3;
+      spawnInterval = Math.max(0.7, 1.6 - s * 0.02);
+
+      // プレイヤー移動
+      if (keys.left)  playerX -= PLAYER_SPEED * dt;
+      if (keys.right) playerX += PLAYER_SPEED * dt;
+      playerX = Math.max(0, Math.min(CONTAINER_W - PLAYER_W, playerX));
+      playerEl.style.left = playerX + 'px';
+
+      // スポーン
+      spawnTimer += dt;
+      if (spawnTimer >= spawnInterval) {
+        spawnTimer = 0;
+        spawnItem();
+        // スコア8以上でたまに連続出現
+        if (s >= 8 && Math.random() < 0.3) {
+          setTimeout(spawnItem, 400 + Math.random() * 200);
+        }
+      }
+
+      // アイテム落下 & 判定
+      const containerH = container.offsetHeight;
+      for (let i = items.length - 1; i >= 0; i--) {
+        const item = items[i];
+        item.y += fallSpeed * dt;
+        const bottomPx = containerH - item.y - ITEM_H;
+        item.el.style.top = item.y + 'px';
+
+        // 地面（プレイヤーより少し上）でキャッチ判定
+        if (item.y >= containerH - GROUND_H - ITEM_H - 40) {
+          const itemCenter = item.x + ITEM_W / 2;
+          const playerLeft  = playerX - 8;
+          const playerRight = playerX + PLAYER_W + 8;
+
+          if (itemCenter >= playerLeft && itemCenter <= playerRight) {
+            // キャッチ！
+            if (item.isMelon) {
+              score += 3;
+              spawnPop(item.x, GROUND_H + 50, '✨+3');
+            } else {
+              spawnPop(item.x, GROUND_H + 50, '💥');
+              loseLife();
+            }
+          } else {
+            // 地面到達
+            if (item.isMelon) {
+              // メロンを逃したらライフ消費
+              spawnPop(item.x, GROUND_H + 10, '😢');
+              loseLife();
+            }
+            // オレオを逃してもOK
+          }
+          item.el.remove();
+          items.splice(i, 1);
+          if (!gameRunning) return;
+          continue;
+        }
+
+        // 画面外下（念のため）
+        if (item.y > containerH) {
+          item.el.remove();
+          items.splice(i, 1);
+        }
+      }
+
+      if (gameRunning) animFrame = requestAnimationFrame(gameLoop);
+    }
+
+    // キーボード
+    document.addEventListener('keydown', e => {
+      if (e.key === 'ArrowLeft'  || e.key === 'a' || e.key === 'A') keys.left  = true;
+      if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = true;
+      if ((e.key === ' ' || e.key === 'Enter') && !gameRunning) startGame();
+    });
+    document.addEventListener('keyup', e => {
+      if (e.key === 'ArrowLeft'  || e.key === 'a' || e.key === 'A') keys.left  = false;
+      if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false;
+    });
+
+    // タッチボタン
+    btnLeft.addEventListener('pointerdown', e => { e.preventDefault(); keys.left = true; });
+    btnLeft.addEventListener('pointerup',   e => { e.preventDefault(); keys.left = false; });
+    btnLeft.addEventListener('pointerleave',e => { keys.left = false; });
+
+    btnRight.addEventListener('pointerdown', e => { e.preventDefault(); keys.right = true; });
+    btnRight.addEventListener('pointerup',   e => { e.preventDefault(); keys.right = false; });
+    btnRight.addEventListener('pointerleave',e => { keys.right = false; });
+
+    // スタートボタン
+    startBtn.addEventListener('click', startGame);
+  </script>
+</body>
+</html>
