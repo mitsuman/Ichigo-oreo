@@ -1,0 +1,603 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+  <title>🥑 アボカドオレオレース 🏎️</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      background: #1a1a2e;
+      display: flex; flex-direction: column; align-items: center;
+      padding: 10px 8px 14px; min-height: 100vh;
+      font-family: "Hiragino Maru Gothic Pro", "Rounded Mplus 1c", sans-serif;
+      user-select: none; touch-action: none;
+    }
+    #game-nav {
+      display: flex; gap: 8px; margin-bottom: 10px;
+      flex-wrap: wrap; justify-content: center;
+    }
+    #game-nav a {
+      padding: 6px 12px; border-radius: 50px; text-decoration: none;
+      font-size: 0.8rem; font-weight: bold; border: 3px solid transparent;
+      background: rgba(255,255,255,0.15); color: #ccc; transition: transform 0.1s;
+    }
+    #game-nav a:hover { transform: scale(1.05); }
+    #game-nav a.active { background: #2d5a27; color: #fff; border-color: #4caf50; }
+    #game-nav a:not(.active):hover { background: rgba(255,255,255,0.25); color: #fff; }
+    h1 { font-size: 1.6rem; color: #a5d6a7; text-shadow: 0 0 12px #4caf5088; margin-bottom: 6px; text-align: center; }
+    #hud {
+      display: flex; gap: 14px; font-size: 1rem; font-weight: bold;
+      color: #fff; margin-bottom: 6px; background: rgba(0,0,0,0.45);
+      padding: 6px 18px; border-radius: 30px;
+    }
+    #hud span { white-space: nowrap; }
+    #canvas-wrap { position: relative; }
+    canvas {
+      display: block; border-radius: 16px;
+      border: 4px solid #4caf50;
+      box-shadow: 0 0 24px #4caf5055;
+    }
+    #overlay {
+      position: absolute; inset: 0; display: flex; flex-direction: column;
+      align-items: center; justify-content: center;
+      background: rgba(0,0,0,0.82); border-radius: 13px;
+      gap: 10px; z-index: 10; padding: 20px;
+    }
+    #overlay h2 { font-size: 1.7rem; color: #a5d6a7; text-align: center; line-height: 1.4; }
+    #overlay p  { font-size: 0.95rem; color: #ccc; text-align: center; line-height: 2.0; }
+    #start-btn {
+      padding: 14px 48px; font-size: 1.4rem;
+      background: linear-gradient(135deg, #388e3c, #1b5e20);
+      color: #fff; border: none; border-radius: 50px; cursor: pointer;
+      font-family: inherit; box-shadow: 0 4px 16px #4caf5066;
+      transition: transform 0.1s;
+    }
+    #start-btn:active { transform: scale(0.95); }
+    #touch-controls {
+      display: flex; gap: 10px; margin-top: 8px; align-items: center;
+    }
+    .tbtn {
+      width: 90px; height: 58px; font-size: 1.7rem;
+      background: rgba(255,255,255,0.12); border: 3px solid #4caf50;
+      border-radius: 14px; cursor: pointer; display: flex;
+      align-items: center; justify-content: center; color: #fff;
+    }
+    .tbtn:active { background: rgba(76,175,80,0.3); }
+    #btn-accel {
+      width: 80px; height: 80px; font-size: 2.2rem;
+      background: rgba(76,175,80,0.2); border: 3px solid #81c784;
+      border-radius: 50%; cursor: pointer; display: flex;
+      align-items: center; justify-content: center; color: #fff;
+    }
+    #btn-accel:active { background: rgba(76,175,80,0.5); }
+    #hint { margin-top: 6px; font-size: 0.85rem; color: #888; text-align: center; }
+    #lap-msg {
+      position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+      font-size: 2.2rem; font-weight: bold; color: #ffeb3b;
+      text-shadow: 0 0 16px #ff9800, 2px 2px 0 #000;
+      pointer-events: none; z-index: 5; opacity: 0; transition: opacity 0.2s;
+      white-space: nowrap;
+    }
+  </style>
+</head>
+<body>
+  <nav id="game-nav">
+    <a href="index.html">🍓 イチゴ</a>
+    <a href="index2.html">🍈 メロン</a>
+    <a href="index3.html">🍍 パイナップル</a>
+    <a href="index4.html">🍌 バナナ</a>
+    <a href="index5.html">🍞 パン</a>
+    <a href="index6.html" class="active">🥑 アボカド</a>
+  </nav>
+
+  <h1>🥑 アボカドオレオレース 🏎️</h1>
+
+  <div id="hud">
+    <span>ラップ：<span id="lap-disp">0</span>/<span id="total-laps">3</span></span>
+    <span>タイム：<span id="timer">0.0</span>s</span>
+    <span>はやさ：<span id="speed-disp">0</span></span>
+    <span>じゅんい：<span id="rank-disp">1</span>/<span id="total-cars">4</span>位</span>
+  </div>
+
+  <div id="canvas-wrap">
+    <canvas id="canvas" width="400" height="480"></canvas>
+    <div id="lap-msg"></div>
+    <div id="overlay">
+      <div style="font-size:2.8rem">🥑</div>
+      <h2 id="ov-title">アボカドオレオレース！</h2>
+      <p id="ov-msg">
+        ◀ ▶ で　まがる<br>
+        ▲ で　アクセル　▼ で　ブレーキ<br>
+        または　がめんをドラッグ！<br>
+        🏁 3ラップ さきにゴール！
+      </p>
+      <button id="start-btn">▶ スタート！</button>
+    </div>
+  </div>
+
+  <div id="touch-controls">
+    <div class="tbtn" id="btn-left">◀</div>
+    <div class="tbtn" id="btn-right">▶</div>
+    <div id="btn-accel">▲</div>
+  </div>
+  <div id="hint">◀ ▶ + ▲ キー　または　画面ドラッグ＋タップ</div>
+
+  <script>
+    const canvas = document.getElementById('canvas');
+    const ctx    = canvas.getContext('2d');
+    const CW = canvas.width, CH = canvas.height;
+
+    // ── Track definition (center-line waypoints, normalized 0..1) ─────────
+    // A fun oval-ish circuit with a chicane
+    const TRACK_PTS = [
+      [0.50, 0.88], [0.72, 0.88], [0.88, 0.80], [0.93, 0.65],
+      [0.90, 0.50], [0.85, 0.35], [0.78, 0.22], [0.65, 0.13],
+      [0.50, 0.10], [0.35, 0.13], [0.22, 0.22], [0.14, 0.35],
+      [0.10, 0.50], [0.13, 0.65], [0.20, 0.80], [0.35, 0.88],
+    ].map(([nx, ny]) => ({ x: nx * CW, y: ny * CH }));
+
+    const TRACK_W = 52; // half-width of road
+    const TOTAL_LAPS = 3;
+    const NUM_AI = 3;
+
+    // ── Precompute segment lengths & cumulative arc length ────────────────
+    const SEG_COUNT = TRACK_PTS.length;
+    const segLen = [];
+    let totalLen = 0;
+    for (let i = 0; i < SEG_COUNT; i++) {
+      const a = TRACK_PTS[i], b = TRACK_PTS[(i + 1) % SEG_COUNT];
+      const d = Math.hypot(b.x - a.x, b.y - a.y);
+      segLen.push(d);
+      totalLen += d;
+    }
+    // cumulative from 0
+    const cumLen = [0];
+    for (let i = 0; i < SEG_COUNT; i++) cumLen.push(cumLen[i] + segLen[i]);
+
+    // track progress [0..1) → world pos {x,y,angle}
+    function trackPos(progress) {
+      const dist = ((progress % 1) + 1) % 1 * totalLen;
+      let seg = 0;
+      for (let i = 0; i < SEG_COUNT; i++) {
+        if (dist <= cumLen[i + 1]) { seg = i; break; }
+      }
+      const t = (dist - cumLen[seg]) / segLen[seg];
+      const a = TRACK_PTS[seg], b = TRACK_PTS[(seg + 1) % SEG_COUNT];
+      return {
+        x: a.x + (b.x - a.x) * t,
+        y: a.y + (b.y - a.y) * t,
+        angle: Math.atan2(b.y - a.y, b.x - a.x),
+      };
+    }
+
+    // convert world pos to track progress (rough nearest-segment)
+    function worldToProgress(wx, wy, nearProg) {
+      let best = nearProg, bestD = Infinity;
+      const check = dp => {
+        const p = ((dp % 1) + 1) % 1;
+        const tp = trackPos(p);
+        const d = Math.hypot(wx - tp.x, wy - tp.y);
+        if (d < bestD) { bestD = d; best = p; }
+      };
+      // search ±10 steps around nearProg
+      for (let s = -10; s <= 10; s++) check(nearProg + s / SEG_COUNT);
+      for (let s = -80; s <= 80; s++) check(nearProg + s / (SEG_COUNT * 20));
+      return best;
+    }
+
+    // ── Draw track ───────────────────────────────────────────────────────
+    function drawTrack() {
+      // road surface
+      ctx.beginPath();
+      const p0 = TRACK_PTS[0];
+      ctx.moveTo(p0.x, p0.y);
+      for (let i = 1; i <= SEG_COUNT; i++) ctx.lineTo(TRACK_PTS[i % SEG_COUNT].x, TRACK_PTS[i % SEG_COUNT].y);
+      ctx.closePath();
+      ctx.strokeStyle = '#37474f';
+      ctx.lineWidth = TRACK_W * 2;
+      ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+      ctx.stroke();
+
+      // road surface color
+      ctx.strokeStyle = '#546e7a';
+      ctx.lineWidth = TRACK_W * 2 - 6;
+      ctx.stroke();
+
+      // center dashed line
+      ctx.strokeStyle = '#ffeb3b44';
+      ctx.lineWidth = 3;
+      ctx.setLineDash([18, 18]);
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      // edges (white/orange kerbs)
+      for (const side of [-1, 1]) {
+        ctx.beginPath();
+        for (let i = 0; i <= SEG_COUNT; i++) {
+          const tp = trackPos(i / SEG_COUNT);
+          const nx = -Math.sin(tp.angle) * (TRACK_W + 4) * side;
+          const ny =  Math.cos(tp.angle) * (TRACK_W + 4) * side;
+          i === 0 ? ctx.moveTo(tp.x + nx, tp.y + ny) : ctx.lineTo(tp.x + nx, tp.y + ny);
+        }
+        ctx.strokeStyle = side === -1 ? '#ef5350' : '#ef5350';
+        ctx.lineWidth = 6;
+        ctx.setLineDash([14, 14]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+
+      // start/finish line
+      const sf = trackPos(0);
+      const nx = -Math.sin(sf.angle) * TRACK_W;
+      const ny =  Math.cos(sf.angle) * TRACK_W;
+      ctx.save();
+      ctx.translate(sf.x, sf.y); ctx.rotate(sf.angle + Math.PI / 2);
+      const sqSize = 10;
+      for (let row = 0; row < 6; row++) {
+        for (let col = 0; col < 2; col++) {
+          ctx.fillStyle = (row + col) % 2 === 0 ? '#fff' : '#000';
+          ctx.fillRect((col - 1) * sqSize, (row - 3) * sqSize, sqSize, sqSize);
+        }
+      }
+      ctx.restore();
+    }
+
+    // ── Car class ────────────────────────────────────────────────────────
+    const CAR_EMOJIS   = ['🥑', '🏎️', '🚗', '🚙'];
+    const AI_COLORS    = ['#ff7043', '#42a5f5', '#ab47bc'];
+    const MAX_SPEED    = 220;
+    const ACCEL        = 200;
+    const BRAKE        = 320;
+    const FRICTION     = 90;
+    const STEER_RATE   = 2.2;  // rad/s
+    const OFF_TRACK_FACTOR = 0.45;
+
+    class Car {
+      constructor(idx, isPlayer) {
+        this.idx      = idx;
+        this.isPlayer = isPlayer;
+        this.emoji    = CAR_EMOJIS[idx];
+        this.color    = isPlayer ? '#69f0ae' : AI_COLORS[idx - 1];
+        this.reset(idx);
+      }
+      reset(idx) {
+        // stagger starting positions
+        const startOff = 0.02 + idx * 0.025;
+        const tp = trackPos(startOff);
+        const side = (idx % 2 === 0 ? 1 : -1);
+        this.x      = tp.x + Math.cos(tp.angle + Math.PI / 2) * side * 12;
+        this.y      = tp.y + Math.sin(tp.angle + Math.PI / 2) * side * 12;
+        this.angle  = tp.angle;
+        this.speed  = 0;
+        this.prog   = startOff;  // track progress [0..1)
+        this.laps   = 0;
+        this.lapProg = startOff; // accumulated progress across laps
+        this.lastProg = startOff;
+        this.finished = false;
+        this.finishTime = Infinity;
+      }
+    }
+
+    let player, aiCars, allCars;
+    let lapDisp, timerEl, speedDisp, rankDisp;
+    let gameRunning, gameFinished;
+    let elapsed, lastTime;
+    let keys = { left: false, right: false, up: false, down: false };
+    let effects = [];
+
+    lapDisp   = document.getElementById('lap-disp');
+    timerEl   = document.getElementById('timer');
+    speedDisp = document.getElementById('speed-disp');
+    rankDisp  = document.getElementById('rank-disp');
+    document.getElementById('total-laps').textContent = TOTAL_LAPS;
+    document.getElementById('total-cars').textContent = NUM_AI + 1;
+
+    const overlay  = document.getElementById('overlay');
+    const ovTitle  = document.getElementById('ov-title');
+    const ovMsg    = document.getElementById('ov-msg');
+    const startBtn = document.getElementById('start-btn');
+    const lapMsgEl = document.getElementById('lap-msg');
+
+    function addEffect(x, y, text, color) {
+      effects.push({ x, y, text, color: color || '#ffeb3b', life: 1.0 });
+    }
+
+    function showLapMsg(msg) {
+      lapMsgEl.textContent = msg;
+      lapMsgEl.style.opacity = '1';
+      clearTimeout(lapMsgEl._t);
+      lapMsgEl._t = setTimeout(() => { lapMsgEl.style.opacity = '0'; }, 1200);
+    }
+
+    // ── Is point on track? ───────────────────────────────────────────────
+    function isOnTrack(wx, wy, prog) {
+      const tp = trackPos(prog);
+      const d  = Math.hypot(wx - tp.x, wy - tp.y);
+      return d <= TRACK_W + 8;
+    }
+
+    // ── Update one car ───────────────────────────────────────────────────
+    function updateCar(car, dt, steerInput, accelInput, brakeInput) {
+      if (car.finished) return;
+
+      const onTrack = isOnTrack(car.x, car.y, car.prog);
+      const speedFactor = onTrack ? 1.0 : OFF_TRACK_FACTOR;
+      const maxSpd = MAX_SPEED * speedFactor;
+
+      // steering
+      if (car.speed > 5) car.angle += steerInput * STEER_RATE * dt;
+
+      // acceleration / friction
+      if (accelInput > 0) {
+        car.speed = Math.min(maxSpd, car.speed + ACCEL * accelInput * dt * speedFactor);
+      } else if (brakeInput > 0) {
+        car.speed = Math.max(0, car.speed - BRAKE * brakeInput * dt);
+      } else {
+        car.speed = Math.max(0, car.speed - FRICTION * dt);
+      }
+      if (!onTrack) car.speed = Math.min(car.speed, maxSpd);
+
+      // move
+      car.x += Math.cos(car.angle) * car.speed * dt;
+      car.y += Math.sin(car.angle) * car.speed * dt;
+
+      // update progress
+      const newProg = worldToProgress(car.x, car.y, car.prog);
+      // detect crossing finish line (prog wraps 0.95→0.05 etc.)
+      const dp = newProg - car.prog;
+      if (dp < -0.5) {
+        // crossed finish line forward
+        car.laps++;
+        car.lapProg = car.laps + newProg;
+        if (car.isPlayer) {
+          lapDisp.textContent = Math.min(car.laps, TOTAL_LAPS);
+          if (car.laps < TOTAL_LAPS) {
+            showLapMsg('ラップ ' + car.laps + '！');
+            addEffect(CW / 2, CH / 2, '🏁 ラップ ' + car.laps + '！', '#ffeb3b');
+          } else {
+            car.finished = true;
+            car.finishTime = elapsed;
+            endGame(true);
+            return;
+          }
+        } else {
+          if (car.laps >= TOTAL_LAPS) {
+            car.finished = true;
+            car.finishTime = elapsed;
+          }
+        }
+      } else if (dp > 0.5) {
+        // crossed backwards — don't count
+        car.lapProg = car.laps + newProg;
+      } else {
+        car.lapProg = car.laps + newProg;
+      }
+      car.prog = newProg;
+    }
+
+    // ── AI driver ────────────────────────────────────────────────────────
+    function aiControl(car) {
+      // Lookahead: steer toward point ahead on track
+      const lookAhead = 0.035 + Math.random() * 0.005;
+      const target = trackPos((car.prog + lookAhead) % 1);
+      const desiredAngle = Math.atan2(target.y - car.y, target.x - car.x);
+      let angleDiff = desiredAngle - car.angle;
+      while (angleDiff >  Math.PI) angleDiff -= Math.PI * 2;
+      while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
+
+      const steer  = Math.max(-1, Math.min(1, angleDiff * 3.5));
+      const accel  = car.laps < TOTAL_LAPS ? (0.75 + car.idx * 0.02) : 0;
+      return { steer, accel };
+    }
+
+    // ── Update ────────────────────────────────────────────────────────────
+    function update(dt) {
+      elapsed += dt;
+      timerEl.textContent = elapsed.toFixed(1);
+
+      // Player control
+      const steer = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+      const accel = keys.up   ? 1 : 0;
+      const brake = keys.down ? 1 : 0;
+      updateCar(player, dt, steer, accel, brake);
+
+      // AI cars
+      for (const ai of aiCars) {
+        const ctrl = aiControl(ai);
+        updateCar(ai, dt, ctrl.steer, ctrl.accel, 0);
+      }
+
+      // HUD
+      speedDisp.textContent = Math.round(player.speed * 0.6);
+
+      // Rank (by lapProg descending)
+      const sorted = [...allCars].sort((a, b) => b.lapProg - a.lapProg);
+      const rankIdx = sorted.findIndex(c => c.isPlayer) + 1;
+      rankDisp.textContent = rankIdx;
+
+      // Effects
+      for (let i = effects.length - 1; i >= 0; i--) {
+        effects[i].life -= dt * 1.2;
+        if (effects[i].life <= 0) effects.splice(i, 1);
+      }
+    }
+
+    // ── Render ───────────────────────────────────────────────────────────
+    function render() {
+      // Background (grass)
+      ctx.fillStyle = '#2e7d32';
+      ctx.fillRect(0, 0, CW, CH);
+
+      // Grass texture dots
+      ctx.fillStyle = '#388e3c';
+      for (let gx = 0; gx < CW; gx += 30)
+        for (let gy = 0; gy < CH; gy += 30)
+          ctx.fillRect(gx + 4, gy + 4, 8, 8);
+
+      drawTrack();
+
+      // All cars (AI first, player on top)
+      for (const car of [...aiCars, player]) {
+        ctx.save();
+        ctx.translate(car.x, car.y);
+        ctx.rotate(car.angle + Math.PI / 2);
+        ctx.font = car.isPlayer ? '28px serif' : '22px serif';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        // shadow
+        ctx.globalAlpha = 0.3;
+        ctx.fillText(car.emoji, 3, 3);
+        ctx.globalAlpha = 1;
+        ctx.fillText(car.emoji, 0, 0);
+        ctx.restore();
+      }
+
+      // Float effects
+      for (const e of effects) {
+        ctx.globalAlpha = Math.max(0, e.life);
+        ctx.font = 'bold 15px "Hiragino Maru Gothic Pro", sans-serif';
+        ctx.fillStyle = e.color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.fillText(e.text, e.x, e.y - (1 - e.life) * 50);
+      }
+      ctx.globalAlpha = 1;
+
+      // Mini-map (bottom-right corner)
+      drawMinimap();
+    }
+
+    function drawMinimap() {
+      const mx = CW - 90, my = CH - 90, mw = 80, mh = 80;
+      ctx.fillStyle = 'rgba(0,0,0,0.5)';
+      ctx.beginPath(); ctx.roundRect(mx - 4, my - 4, mw + 8, mh + 8, 8); ctx.fill();
+
+      // track outline
+      ctx.beginPath();
+      const scaleX = x => mx + (x / CW) * mw;
+      const scaleY = y => my + (y / CH) * mh;
+      ctx.moveTo(scaleX(TRACK_PTS[0].x), scaleY(TRACK_PTS[0].y));
+      for (let i = 1; i <= SEG_COUNT; i++) {
+        ctx.lineTo(scaleX(TRACK_PTS[i % SEG_COUNT].x), scaleY(TRACK_PTS[i % SEG_COUNT].y));
+      }
+      ctx.closePath();
+      ctx.strokeStyle = '#78909c'; ctx.lineWidth = 6; ctx.stroke();
+
+      // car dots
+      for (const car of allCars) {
+        ctx.fillStyle = car.isPlayer ? '#69f0ae' : '#ff7043';
+        ctx.beginPath();
+        ctx.arc(scaleX(car.x), scaleY(car.y), car.isPlayer ? 4 : 3, 0, Math.PI * 2);
+        ctx.fill();
+      }
+    }
+
+    // ── Game control ─────────────────────────────────────────────────────
+    function initGame() {
+      player = new Car(0, true);
+      aiCars = [];
+      for (let i = 1; i <= NUM_AI; i++) aiCars.push(new Car(i, false));
+      allCars = [player, ...aiCars];
+      effects = [];
+      elapsed = 0;
+      gameFinished = false;
+      lapDisp.textContent = '0';
+      timerEl.textContent = '0.0';
+      speedDisp.textContent = '0';
+      rankDisp.textContent = '1';
+    }
+
+    function startGame() {
+      initGame();
+      overlay.style.display = 'none';
+      gameRunning = true;
+      lastTime = performance.now();
+      requestAnimationFrame(gameLoop);
+    }
+
+    function endGame(playerWon) {
+      gameRunning = false;
+      const sorted = [...allCars].sort((a, b) => b.lapProg - a.lapProg);
+      const rank   = sorted.findIndex(c => c.isPlayer) + 1;
+      const medal  = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '😢';
+      const rankTxt = rank === 1 ? 'ゆうしょう！！' : rank + 'い！';
+      ovTitle.textContent = medal + ' ' + rankTxt;
+      ovMsg.innerHTML =
+        'タイム：' + elapsed.toFixed(1) + 'びょう<br>' +
+        (rank === 1 ? 'すごい！ いちばんはやかった！🎉' : 'もう一回チャレンジ！');
+      startBtn.textContent = '▶ もういちど！';
+      overlay.style.display = 'flex';
+    }
+
+    // ── Game loop ─────────────────────────────────────────────────────────
+    function gameLoop(now) {
+      const dt = Math.min((now - lastTime) / 1000, 0.05);
+      lastTime = now;
+      if (gameRunning) {
+        update(dt);
+        render();
+        requestAnimationFrame(gameLoop);
+      }
+    }
+
+    // ── Input ──────────────────────────────────────────────────────────
+    document.addEventListener('keydown', e => {
+      if (e.key === 'ArrowLeft'  || e.key === 'a' || e.key === 'A') keys.left  = true;
+      if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = true;
+      if (e.key === 'ArrowUp'    || e.key === 'w' || e.key === 'W') keys.up    = true;
+      if (e.key === 'ArrowDown'  || e.key === 's' || e.key === 'S') keys.down  = true;
+      if ((e.key === ' ' || e.key === 'Enter') && !gameRunning) startGame();
+      if (['ArrowLeft','ArrowRight','ArrowUp','ArrowDown',' '].includes(e.key)) e.preventDefault();
+    });
+    document.addEventListener('keyup', e => {
+      if (e.key === 'ArrowLeft'  || e.key === 'a' || e.key === 'A') keys.left  = false;
+      if (e.key === 'ArrowRight' || e.key === 'd' || e.key === 'D') keys.right = false;
+      if (e.key === 'ArrowUp'    || e.key === 'w' || e.key === 'W') keys.up    = false;
+      if (e.key === 'ArrowDown'  || e.key === 's' || e.key === 'S') keys.down  = false;
+    });
+
+    // Touch buttons
+    const btnLeft  = document.getElementById('btn-left');
+    const btnRight = document.getElementById('btn-right');
+    const btnAccel = document.getElementById('btn-accel');
+    btnLeft.addEventListener('pointerdown',  e => { e.preventDefault(); keys.left  = true; });
+    btnLeft.addEventListener('pointerup',    e => { e.preventDefault(); keys.left  = false; });
+    btnLeft.addEventListener('pointerleave', ()  => { keys.left  = false; });
+    btnRight.addEventListener('pointerdown',  e => { e.preventDefault(); keys.right = true; });
+    btnRight.addEventListener('pointerup',    e => { e.preventDefault(); keys.right = false; });
+    btnRight.addEventListener('pointerleave', ()  => { keys.right = false; });
+    btnAccel.addEventListener('pointerdown',  e => { e.preventDefault(); keys.up = true; });
+    btnAccel.addEventListener('pointerup',    e => { e.preventDefault(); keys.up = false; });
+    btnAccel.addEventListener('pointerleave', ()  => { keys.up = false; });
+
+    // Canvas drag: horizontal=steer, vertical (up)=accelerate
+    let dragStartX = null, dragStartY = null;
+    canvas.addEventListener('pointerdown', e => {
+      e.preventDefault();
+      dragStartX = e.clientX; dragStartY = e.clientY;
+      keys.up = true; // tap = accelerate
+    });
+    canvas.addEventListener('pointermove', e => {
+      if (dragStartX === null) return;
+      const dx = e.clientX - dragStartX;
+      const dy = e.clientY - dragStartY;
+      keys.left  = dx < -20;
+      keys.right = dx >  20;
+      keys.down  = dy >  30;
+      keys.up    = dy <= 30;
+    });
+    const stopDrag = () => {
+      dragStartX = null; dragStartY = null;
+      keys.left = false; keys.right = false; keys.up = false; keys.down = false;
+    };
+    canvas.addEventListener('pointerup',     stopDrag);
+    canvas.addEventListener('pointercancel', stopDrag);
+
+    startBtn.addEventListener('click', startGame);
+
+    // Initial render
+    initGame();
+    ctx.fillStyle = '#2e7d32'; ctx.fillRect(0, 0, CW, CH);
+    drawTrack();
+  </script>
+</body>
+</html>
