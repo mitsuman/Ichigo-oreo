@@ -72,6 +72,14 @@
       pointer-events: none; z-index: 5; opacity: 0; transition: opacity 0.2s;
       white-space: nowrap;
     }
+    .course-btn {
+      padding: 8px 14px; font-size: 0.85rem; font-family: inherit;
+      background: rgba(255,255,255,0.10); border: 2px solid #546e7a;
+      border-radius: 10px; cursor: pointer; color: #ccc;
+      line-height: 1.6; text-align: center; transition: 0.15s;
+    }
+    .course-btn.selected { border-color: #4caf50; background: rgba(76,175,80,0.22); color: #fff; }
+    .course-btn:active { background: rgba(76,175,80,0.4); }
   </style>
 </head>
 <body>
@@ -104,6 +112,15 @@
         または　がめんを　ドラッグ！<br>
         🏁 3ラップ さきにゴール！
       </p>
+      <div id="course-select-wrap">
+        <div style="color:#b0bec5;font-size:0.82rem;margin-bottom:5px">コースをえらぼう！</div>
+        <div style="display:flex;gap:8px;justify-content:center">
+          <button class="course-btn selected" data-course="0">コース1<br><span style="font-size:0.72rem">🔵 かいてん</span></button>
+          <button class="course-btn" data-course="1">コース2<br><span style="font-size:0.72rem">🟡 しかく</span></button>
+          <button class="course-btn" data-course="2">コース3<br><span style="font-size:0.72rem">🔴 くるくる</span></button>
+        </div>
+      </div>
+      <div id="rival-level-disp" style="color:#ffa726;font-size:0.88rem;min-height:1.3em"></div>
       <button id="start-btn">▶ スタート！</button>
     </div>
   </div>
@@ -119,32 +136,66 @@
     const ctx    = canvas.getContext('2d');
     const CW = canvas.width, CH = canvas.height;
 
-    // ── Track definition (center-line waypoints, normalized 0..1) ─────────
-    // A fun oval-ish circuit with a chicane
-    const TRACK_PTS = [
-      [0.50, 0.88], [0.72, 0.88], [0.88, 0.80], [0.93, 0.65],
-      [0.90, 0.50], [0.85, 0.35], [0.78, 0.22], [0.65, 0.13],
-      [0.50, 0.10], [0.35, 0.13], [0.22, 0.22], [0.14, 0.35],
-      [0.10, 0.50], [0.13, 0.65], [0.20, 0.80], [0.35, 0.88],
-    ].map(([nx, ny]) => ({ x: nx * CW, y: ny * CH }));
+    // ── Course definitions ──────────────────────────────────────────────
+    const COURSES = [
+      {
+        name: 'かいてん', width: 52,
+        pts: [
+          [0.50, 0.88], [0.72, 0.88], [0.88, 0.80], [0.93, 0.65],
+          [0.90, 0.50], [0.85, 0.35], [0.78, 0.22], [0.65, 0.13],
+          [0.50, 0.10], [0.35, 0.13], [0.22, 0.22], [0.14, 0.35],
+          [0.10, 0.50], [0.13, 0.65], [0.20, 0.80], [0.35, 0.88],
+        ],
+      },
+      {
+        name: 'しかく', width: 44,
+        pts: [
+          [0.50, 0.88], [0.80, 0.88], [0.90, 0.70],
+          [0.90, 0.30], [0.80, 0.12], [0.50, 0.12],
+          [0.20, 0.12], [0.10, 0.30], [0.10, 0.70],
+          [0.20, 0.88],
+        ],
+      },
+      {
+        name: 'くるくる', width: 40,
+        pts: [
+          [0.50, 0.90], [0.72, 0.85], [0.85, 0.72],
+          [0.85, 0.55], [0.70, 0.46], [0.55, 0.40],
+          [0.70, 0.30], [0.72, 0.18], [0.58, 0.10],
+          [0.42, 0.10], [0.28, 0.18], [0.30, 0.30],
+          [0.45, 0.40], [0.30, 0.46], [0.15, 0.55],
+          [0.15, 0.72], [0.28, 0.85],
+        ],
+      },
+    ];
 
-    const TRACK_W = 52; // half-width of road
+    let TRACK_PTS, TRACK_W;
     const TOTAL_LAPS = 3;
     const NUM_AI = 3;
+    let currentCourse = 0;
+    let rivalLevel = 0;
 
-    // ── Precompute segment lengths & cumulative arc length ────────────────
-    const SEG_COUNT = TRACK_PTS.length;
-    const segLen = [];
-    let totalLen = 0;
-    for (let i = 0; i < SEG_COUNT; i++) {
-      const a = TRACK_PTS[i], b = TRACK_PTS[(i + 1) % SEG_COUNT];
-      const d = Math.hypot(b.x - a.x, b.y - a.y);
-      segLen.push(d);
-      totalLen += d;
+    function updateRivalDisplay() {
+      const el = document.getElementById('rival-level-disp');
+      if (el) el.textContent = rivalLevel > 0 ? 'ライバル強さ：' + '⭐'.repeat(Math.min(rivalLevel, 5)) : '';
     }
-    // cumulative from 0
-    const cumLen = [0];
-    for (let i = 0; i < SEG_COUNT; i++) cumLen.push(cumLen[i] + segLen[i]);
+
+    let SEG_COUNT, segLen, totalLen, cumLen;
+    function initTrack(idx) {
+      currentCourse = idx;
+      const c = COURSES[idx];
+      TRACK_PTS = c.pts.map(([nx, ny]) => ({ x: nx * CW, y: ny * CH }));
+      TRACK_W   = c.width;
+      SEG_COUNT = TRACK_PTS.length;
+      segLen = []; totalLen = 0;
+      for (let i = 0; i < SEG_COUNT; i++) {
+        const a = TRACK_PTS[i], b = TRACK_PTS[(i + 1) % SEG_COUNT];
+        const d = Math.hypot(b.x - a.x, b.y - a.y);
+        segLen.push(d); totalLen += d;
+      }
+      cumLen = [0];
+      for (let i = 0; i < SEG_COUNT; i++) cumLen.push(cumLen[i] + segLen[i]);
+    }
 
     // track progress [0..1) → world pos {x,y,angle}
     function trackPos(progress) {
@@ -378,8 +429,10 @@
       while (angleDiff >  Math.PI) angleDiff -= Math.PI * 2;
       while (angleDiff < -Math.PI) angleDiff += Math.PI * 2;
 
-      const steer  = Math.max(-1, Math.min(1, angleDiff * 3.5));
-      const accel  = car.laps < TOTAL_LAPS ? (0.75 + car.idx * 0.02) : 0;
+      const steer     = Math.max(-1, Math.min(1, angleDiff * 3.5));
+      const rivalMult  = 1 + rivalLevel * 0.12;
+      const baseAccel  = 0.75 + car.idx * 0.02;
+      const accel      = car.laps < TOTAL_LAPS ? Math.min(1.5, baseAccel * rivalMult) : 0;
       return { steer, accel };
     }
 
@@ -541,6 +594,7 @@
     }
 
     function startGame() {
+      initTrack(currentCourse);
       initGame();
       overlay.style.display = 'none';
       gameRunning = true;
@@ -555,9 +609,15 @@
       const medal  = rank === 1 ? '🥇' : rank === 2 ? '🥈' : rank === 3 ? '🥉' : '😢';
       const rankTxt = rank === 1 ? 'ゆうしょう！！' : rank + 'い！';
       ovTitle.textContent = medal + ' ' + rankTxt;
+      let extraMsg = '';
+      if (rank === 1) {
+        rivalLevel++;
+        extraMsg = '<br>🔥 ライバルが さらに はやくなった！';
+        updateRivalDisplay();
+      }
       ovMsg.innerHTML =
         'タイム：' + elapsed.toFixed(1) + 'びょう<br>' +
-        (rank === 1 ? 'すごい！ いちばんはやかった！🎉' : 'もう一回チャレンジ！');
+        (rank === 1 ? 'すごい！ いちばんはやかった！🎉' + extraMsg : 'もう一回チャレンジ！');
       startBtn.textContent = '▶ もういちど！';
       overlay.style.display = 'flex';
     }
@@ -608,8 +668,18 @@
     canvas.addEventListener('pointerup',     stopDrag);
     canvas.addEventListener('pointercancel', stopDrag);
 
+    // Course select buttons
+    document.querySelectorAll('.course-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        currentCourse = parseInt(btn.dataset.course);
+        document.querySelectorAll('.course-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+      });
+    });
+
     startBtn.addEventListener('click', startGame);
 
+    initTrack(0);
     initGame();
     render();
   </script>
