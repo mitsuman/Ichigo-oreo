@@ -261,7 +261,7 @@
     // type: 'pick' = 正解1つを選ぶ2択
     // q: 質問文, visual: 大きく見せる絵文字, choices: [{emoji, label, correct}]
     const ALL_QUESTIONS = [
-      // フルーツ識別
+      // ── フルーツ識別 ──
       { visual:'', q:'パイナップルは　どれ？',
         choices:[{e:'🍍',l:'パイナップル',ok:true},{e:'🍇',l:'ブドウ',ok:false}] },
       { visual:'', q:'りんごは　どれ？',
@@ -270,7 +270,17 @@
         choices:[{e:'🍓',l:'イチゴ',ok:true},{e:'🍊',l:'ミカン',ok:false}] },
       { visual:'', q:'スイカは　どれ？',
         choices:[{e:'🍉',l:'スイカ',ok:true},{e:'🍑',l:'モモ',ok:false}] },
-      // 数える
+      { visual:'', q:'バナナは　どれ？',
+        choices:[{e:'🍌',l:'バナナ',ok:true},{e:'🍓',l:'イチゴ',ok:false}] },
+      { visual:'', q:'ぶどうは　どれ？',
+        choices:[{e:'🍇',l:'ブドウ',ok:true},{e:'🍋',l:'レモン',ok:false}] },
+      { visual:'', q:'オレンジは　どれ？',
+        choices:[{e:'🍊',l:'オレンジ',ok:true},{e:'🍈',l:'メロン',ok:false}] },
+      { visual:'', q:'メロンは　どれ？',
+        choices:[{e:'🍈',l:'メロン',ok:true},{e:'🍉',l:'スイカ',ok:false}] },
+      { visual:'', q:'さくらんぼは　どれ？',
+        choices:[{e:'🍒',l:'サクランボ',ok:true},{e:'🍑',l:'モモ',ok:false}] },
+      // ── 数える ──
       { visual:'🍍🍍🍍', q:'パイナップルは　いくつ？',
         choices:[{e:'２',l:'に',ok:false},{e:'３',l:'さん',ok:true}] },
       { visual:'⭐⭐', q:'ほしは　いくつ？',
@@ -279,14 +289,32 @@
         choices:[{e:'３',l:'さん',ok:false},{e:'４',l:'し',ok:true}] },
       { visual:'🐱🐱🐱🐱🐱', q:'ねこは　いくつ？',
         choices:[{e:'４',l:'し',ok:false},{e:'５',l:'ご',ok:true}] },
-      // 色
+      { visual:'🌸', q:'はなは　いくつ？',
+        choices:[{e:'１',l:'いち',ok:true},{e:'２',l:'に',ok:false}] },
+      { visual:'🐥🐥', q:'ひよこは　いくつ？',
+        choices:[{e:'２',l:'に',ok:true},{e:'３',l:'さん',ok:false}] },
+      { visual:'🎈🎈🎈', q:'ふうせんは　いくつ？',
+        choices:[{e:'３',l:'さん',ok:true},{e:'５',l:'ご',ok:false}] },
+      { visual:'🍎🍎🍎🍎', q:'りんごは　いくつ？',
+        choices:[{e:'３',l:'さん',ok:false},{e:'４',l:'し',ok:true}] },
+      { visual:'🌟🌟🌟🌟🌟', q:'ほしは　いくつ？',
+        choices:[{e:'４',l:'し',ok:false},{e:'５',l:'ご',ok:true}] },
+      // ── 色 ──
       { visual:'🌹', q:'バラは　なにいろ？',
         choices:[{e:'🔴',l:'あか',ok:true},{e:'🔵',l:'あお',ok:false}] },
       { visual:'🍋', q:'レモンは　なにいろ？',
         choices:[{e:'🟡',l:'きいろ',ok:true},{e:'🟢',l:'みどり',ok:false}] },
       { visual:'🌊', q:'うみは　なにいろ？',
         choices:[{e:'🔵',l:'あお',ok:true},{e:'🟠',l:'オレンジ',ok:false}] },
-      // 動物
+      { visual:'🍀', q:'クローバーは　なにいろ？',
+        choices:[{e:'🟢',l:'みどり',ok:true},{e:'🟣',l:'むらさき',ok:false}] },
+      { visual:'☁️', q:'くもは　なにいろ？',
+        choices:[{e:'⚪',l:'しろ',ok:true},{e:'⚫',l:'くろ',ok:false}] },
+      { visual:'🍊', q:'ミカンは　なにいろ？',
+        choices:[{e:'🟠',l:'オレンジ',ok:true},{e:'🔴',l:'あか',ok:false}] },
+      { visual:'🍇', q:'ブドウは　なにいろ？',
+        choices:[{e:'🟣',l:'むらさき',ok:true},{e:'🟡',l:'きいろ',ok:false}] },
+      // ── 動物 ──
       { visual:'🐱', q:'「ニャー」と　なくのは？',
         choices:[{e:'🐱',l:'ねこ',ok:true},{e:'🐶',l:'いぬ',ok:false}] },
       { visual:'🐶', q:'「ワン！」と　なくのは？',
@@ -295,18 +323,42 @@
         choices:[{e:'🐘',l:'ゾウ',ok:true},{e:'🐭',l:'ネズミ',ok:false}] },
       { visual:'', q:'そらを　とぶのは？',
         choices:[{e:'✈️',l:'ひこうき',ok:true},{e:'🚗',l:'くるま',ok:false}] },
-      // 食べ物
+      { visual:'🐸', q:'「ケロケロ」と　なくのは？',
+        choices:[{e:'🐸',l:'カエル',ok:true},{e:'🐮',l:'ウシ',ok:false}] },
+      { visual:'🐮', q:'「モー」と　なくのは？',
+        choices:[{e:'🐮',l:'ウシ',ok:true},{e:'🐑',l:'ヒツジ',ok:false}] },
+      { visual:'', q:'みずの　なかに　すむのは？',
+        choices:[{e:'🐟',l:'さかな',ok:true},{e:'🐆',l:'ヒョウ',ok:false}] },
+      { visual:'', q:'きのうえに　すむのは？',
+        choices:[{e:'🐒',l:'サル',ok:true},{e:'🦁',l:'ライオン',ok:false}] },
+      { visual:'🐣', q:'たまごから　でてくるのは？',
+        choices:[{e:'🐣',l:'ヒヨコ',ok:true},{e:'🐱',l:'ねこ',ok:false}] },
+      // ── 食べ物・生活 ──
       { visual:'', q:'あまくて　つめたい　たべものは？',
         choices:[{e:'🍦',l:'アイス',ok:true},{e:'🍜',l:'ラーメン',ok:false}] },
       { visual:'', q:'たまごから　うまれるのは？',
         choices:[{e:'🐔',l:'にわとり',ok:true},{e:'🐷',l:'ブタ',ok:false}] },
-      { visual:'', q:'パンを　やくのは？',
-        choices:[{e:'🍞',l:'パン屋',ok:false},{e:'🔥',l:'ひ（オーブン）',ok:true}] },
-      // 生活
       { visual:'', q:'ねるときに　つかうのは？',
         choices:[{e:'🛏️',l:'ベッド',ok:true},{e:'🚿',l:'シャワー',ok:false}] },
       { visual:'', q:'あめのひに　つかうのは？',
         choices:[{e:'☂️',l:'かさ',ok:true},{e:'🕶️',l:'サングラス',ok:false}] },
+      { visual:'', q:'はみがきに　つかうのは？',
+        choices:[{e:'🪥',l:'はぶらし',ok:true},{e:'🍴',l:'フォーク',ok:false}] },
+      { visual:'', q:'おふろで　つかうのは？',
+        choices:[{e:'🧴',l:'シャンプー',ok:true},{e:'📚',l:'ほん',ok:false}] },
+      { visual:'', q:'よるに　そらに　でるのは？',
+        choices:[{e:'🌙',l:'つき',ok:true},{e:'☀️',l:'たいよう',ok:false}] },
+      { visual:'', q:'あさに　そらに　でるのは？',
+        choices:[{e:'☀️',l:'たいよう',ok:true},{e:'🌙',l:'つき',ok:false}] },
+      // ── 乗り物・形 ──
+      { visual:'', q:'うみを　はしるのは？',
+        choices:[{e:'🚢',l:'ふね',ok:true},{e:'🚂',l:'でんしゃ',ok:false}] },
+      { visual:'', q:'レールの　うえを　はしるのは？',
+        choices:[{e:'🚂',l:'でんしゃ',ok:true},{e:'🚁',l:'ヘリコプター',ok:false}] },
+      { visual:'', q:'まるいのは　どれ？',
+        choices:[{e:'⚽',l:'ボール',ok:true},{e:'📦',l:'はこ',ok:false}] },
+      { visual:'', q:'しかくいのは　どれ？',
+        choices:[{e:'📦',l:'はこ',ok:true},{e:'⚽',l:'ボール',ok:false}] },
     ];
 
     const TOTAL_Q = 10;         // 1ゲームで出す問題数
