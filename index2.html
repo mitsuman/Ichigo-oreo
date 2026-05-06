@@ -473,18 +473,18 @@
     btnRight.addEventListener('pointerup',   e => { e.preventDefault(); keys.right = false; });
     btnRight.addEventListener('pointerleave',e => { keys.right = false; });
 
-    // キャンバスドラッグで左右移動
+    // ゲーム画面ドラッグで左右移動
     let dragStartX = null;
-    canvas.addEventListener('pointerdown', e => { e.preventDefault(); dragStartX = e.clientX; });
-    canvas.addEventListener('pointermove', e => {
+    container.addEventListener('pointerdown', e => { dragStartX = e.clientX; });
+    container.addEventListener('pointermove', e => {
       if (dragStartX === null) return;
       const dx = e.clientX - dragStartX;
       keys.left  = dx < -18;
       keys.right = dx >  18;
     });
     const stopDrag = () => { dragStartX = null; keys.left = false; keys.right = false; };
-    canvas.addEventListener('pointerup',     stopDrag);
-    canvas.addEventListener('pointercancel', stopDrag);
+    container.addEventListener('pointerup',     stopDrag);
+    container.addEventListener('pointercancel', stopDrag);
 
     // スタートボタン
     startBtn.addEventListener('click', startGame);

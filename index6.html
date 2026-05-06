@@ -285,6 +285,7 @@
     let elapsed, lastTime;
     let keys = { left: false, right: false, up: false, down: false };
     let effects = [];
+    let camAngle = 0; // smoothed camera angle (world)
 
     lapDisp   = document.getElementById('lap-disp');
     timerEl   = document.getElementById('timer');
@@ -354,7 +355,7 @@
           lapDisp.textContent = Math.min(car.laps, TOTAL_LAPS);
           if (car.laps < TOTAL_LAPS) {
             showLapMsg('ラップ ' + car.laps + '！');
-            addEffect(CW / 2, CH / 2, '🏁 ラップ ' + car.laps + '！', '#ffeb3b');
+            addEffect(player.x, player.y - 40, '🏁 ラップ ' + car.laps + '！', '#ffeb3b');
           } else {
             car.finished = true;
             car.finishTime = elapsed;
@@ -416,6 +417,12 @@
       const rankIdx = sorted.findIndex(c => c.isPlayer) + 1;
       rankDisp.textContent = rankIdx;
 
+      // Smooth camera angle toward player facing direction
+      let da = player.angle - camAngle;
+      while (da >  Math.PI) da -= Math.PI * 2;
+      while (da < -Math.PI) da += Math.PI * 2;
+      camAngle += da * Math.min(1, dt * 7);
+
       // Effects
       for (let i = effects.length - 1; i >= 0; i--) {
         effects[i].life -= dt * 1.2;
@@ -425,44 +432,80 @@
 
     // ── Render ───────────────────────────────────────────────────────────
     function render() {
-      // Background (grass)
-      ctx.fillStyle = '#2e7d32';
+      const SCREEN_X = CW / 2;
+      const SCREEN_Y = Math.round(CH * 0.60); // player slightly below center
+
+      // Screen-space base fill (no black gaps at rotated corners)
+      ctx.fillStyle = '#388e3c';
       ctx.fillRect(0, 0, CW, CH);
 
-      // Grass texture dots
+      // ── World transform: rotate map so player always faces up ─────────
+      ctx.save();
+      ctx.translate(SCREEN_X, SCREEN_Y);
+      ctx.rotate(-camAngle - Math.PI / 2);
+      ctx.translate(-player.x, -player.y);
+
+      // Grass world background (covers full track area + margins)
       ctx.fillStyle = '#388e3c';
-      for (let gx = 0; gx < CW; gx += 30)
-        for (let gy = 0; gy < CH; gy += 30)
-          ctx.fillRect(gx + 4, gy + 4, 8, 8);
+      ctx.fillRect(-120, -120, CW + 240, CH + 240);
+      ctx.fillStyle = '#2e7d32';
+      for (let gx = -100; gx < CW + 100; gx += 40)
+        for (let gy = -100; gy < CH + 100; gy += 40)
+          ctx.fillRect(gx + 6, gy + 6, 10, 10);
 
       drawTrack();
 
-      // All cars (AI first, player on top)
-      for (const car of [...aiCars, player]) {
+      // AI cars (world space)
+      for (const car of aiCars) {
         ctx.save();
         ctx.translate(car.x, car.y);
         ctx.rotate(car.angle + Math.PI / 2);
-        ctx.font = car.isPlayer ? '28px serif' : '22px serif';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        // shadow
-        ctx.globalAlpha = 0.3;
-        ctx.fillText(car.emoji, 3, 3);
+        ctx.font = '22px serif';
+        ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+        ctx.globalAlpha = 0.28;
+        ctx.fillText(car.emoji, 2, 2);
         ctx.globalAlpha = 1;
         ctx.fillText(car.emoji, 0, 0);
         ctx.restore();
       }
 
-      // Float effects
+      ctx.restore(); // ── end world transform ──────────────────────────
+
+      // Float effects: convert world coords → screen coords so text rises straight up
+      const camRot = -camAngle - Math.PI / 2;
+      const cosR = Math.cos(camRot), sinR = Math.sin(camRot);
       for (const e of effects) {
+        const dx = e.x - player.x, dy = e.y - player.y;
+        const sx = SCREEN_X + dx * cosR - dy * sinR;
+        const sy = SCREEN_Y + dx * sinR + dy * cosR;
         ctx.globalAlpha = Math.max(0, e.life);
         ctx.font = 'bold 15px "Hiragino Maru Gothic Pro", sans-serif';
         ctx.fillStyle = e.color; ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
-        ctx.fillText(e.text, e.x, e.y - (1 - e.life) * 50);
+        ctx.fillText(e.text, sx, sy - (1 - e.life) * 50);
       }
       ctx.globalAlpha = 1;
 
-      // Mini-map (bottom-right corner)
+      // Player car: always at screen center, always facing up
+      ctx.save();
+      ctx.translate(SCREEN_X, SCREEN_Y);
+      ctx.font = '32px serif';
+      ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+      ctx.globalAlpha = 0.28;
+      ctx.fillText(player.emoji, 3, 3);
+      ctx.globalAlpha = 1;
+      ctx.fillText(player.emoji, 0, 0);
+      // Speed ring
+      const sRatio = player.speed / MAX_SPEED;
+      if (sRatio > 0.05) {
+        ctx.strokeStyle = 'rgba(105,240,174,' + (sRatio * 0.7).toFixed(2) + ')';
+        ctx.lineWidth = 3;
+        ctx.beginPath();
+        ctx.arc(0, 0, 22, -Math.PI * 0.85, -Math.PI * 0.85 + sRatio * Math.PI * 1.7);
+        ctx.stroke();
+      }
+      ctx.restore();
+
+      // Mini-map (screen space, not affected by world transform)
       drawMinimap();
     }
 
@@ -494,6 +537,7 @@
     // ── Game control ─────────────────────────────────────────────────────
     function initGame() {
       player = new Car(0, true);
+      camAngle = player.angle; // initialize immediately so no spin-up
       aiCars = [];
       for (let i = 1; i <= NUM_AI; i++) aiCars.push(new Car(i, false));
       allCars = [player, ...aiCars];
@@ -594,10 +638,8 @@
 
     startBtn.addEventListener('click', startGame);
 
-    // Initial render
     initGame();
-    ctx.fillStyle = '#2e7d32'; ctx.fillRect(0, 0, CW, CH);
-    drawTrack();
+    render();
   </script>
 </body>
 </html>
