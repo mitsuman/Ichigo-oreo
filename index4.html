@@ -329,15 +329,16 @@
       // generate platforms ahead
       genPlatforms();
 
-      // player fell below screen
-      if (player.y - cameraY > CH + 60) {
+      // player fell below starting floor (world-Y based, camera can't fool this)
+      if (player.y > INIT_Y + 280) {
         addEffect(CW / 2, cameraY + CH - 50, '😵 おっこちた！', '#ff5252');
         loseLife();
         if (!gameRunning) return;
-        player.y  = cameraY + CH - 80;
+        player.y  = INIT_Y - 20;
         player.x  = CW / 2 - 18;
         player.vy = JUMP_VY;
         player.vx = 0;
+        cameraY   = INIT_Y - CH * 0.5;
       }
     }
 
