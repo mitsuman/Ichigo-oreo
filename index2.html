@@ -20,6 +20,35 @@
       touch-action: none;
     }
 
+    /* ナビゲーションヘッダー */
+    #game-nav {
+      display: flex;
+      gap: 12px;
+      margin-bottom: 10px;
+    }
+    #game-nav a {
+      padding: 8px 20px;
+      border-radius: 50px;
+      text-decoration: none;
+      font-size: 1rem;
+      font-weight: bold;
+      border: 3px solid transparent;
+      background: rgba(255,255,255,0.7);
+      color: #555;
+      transition: transform 0.1s;
+    }
+    #game-nav a:hover { transform: scale(1.05); }
+    #game-nav a.active {
+      background: #43a047;
+      color: white;
+      border-color: #2e7d32;
+    }
+    #game-nav a:not(.active):hover {
+      background: #f1f8e9;
+      color: #43a047;
+      border-color: #43a047;
+    }
+
     h1 {
       font-size: 2rem;
       color: #2e7d32;
@@ -69,6 +98,20 @@
       font-size: 2.6rem;
       line-height: 1;
       pointer-events: none;
+      border-radius: 50%;
+      width: 52px;
+      height: 52px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .item-good {
+      background: rgba(100, 220, 100, 0.55);
+      box-shadow: 0 0 10px 3px #66ff66aa;
+    }
+    .item-bad {
+      background: rgba(230, 60, 60, 0.45);
+      box-shadow: 0 0 10px 3px #ff4444aa;
     }
 
     /* プレイヤー（バスケット） */
@@ -173,6 +216,10 @@
   </style>
 </head>
 <body>
+  <nav id="game-nav">
+    <a href="index.html">🍓 イチゴオレオ</a>
+    <a href="index2.html" class="active">🍈 メロンオレオ</a>
+  </nav>
   <h1>🍈 メロンオレオレース 🍪</h1>
   <div id="hud">
     <span>スコア：<span id="score">0</span></span>
@@ -197,6 +244,10 @@
     <div id="overlay">
       <h2 id="overlay-title">🍈 メロンオレオレース！</h2>
       <p id="overlay-msg">メロンをキャッチして　オレオをよけよう！</p>
+      <p style="font-size:1.3rem; background:#e8f5e9; border-radius:12px; padding:8px 18px;">
+        <span style="color:#2e7d32">🍈 とる！</span>&nbsp;&nbsp;&nbsp;
+        <span style="color:#c62828">🍪 よける！</span>
+      </p>
       <button id="start-btn">▶ スタート！</button>
     </div>
   </div>
@@ -227,9 +278,9 @@
     const GROUND_H    = 52;
     const CATCH_Y     = GROUND_H + 52; // アイテムがプレイヤーに届く高さ（bottom基準）
 
-    // メロン系・オレオ系の絵文字
-    const MELONS = ['🍈', '🍏', '🍀', '⭐', '🎁'];
-    const OREOS  = ['🍪', '🍩', '🍫', '❌'];
+    // メロン系・オレオ系の絵文字（シンプルに統一）
+    const MELONS = ['🍈'];
+    const OREOS  = ['🍪'];
 
     let score = 0;
     let best  = 0;
@@ -272,12 +323,12 @@
     function gameOver() {
       gameRunning = false;
       cancelAnimationFrame(animFrame);
-      if (score > best) {
-        best = score;
-        bestEl.textContent = best;
+      const finalScore = Math.floor(score);
+      if (finalScore > best) {
+        best = finalScore;
       }
       overlayTitle.textContent = 'ゲームオーバー！🍈';
-      overlayMsg.textContent   = `スコア：${score}　さいこう：${best}`;
+      overlayMsg.textContent   = `スコア：${finalScore}　さいこう：${Math.floor(best)}`;
       startBtn.textContent     = '▶ もういちど！';
       overlay.style.display    = 'flex';
     }
@@ -301,6 +352,7 @@
       const isMelon = Math.random() < 0.6; // 60%メロン
       const pool = isMelon ? MELONS : OREOS;
       el.textContent = pool[Math.floor(Math.random() * pool.length)];
+      el.classList.add(isMelon ? 'item-good' : 'item-bad');
       const x = Math.random() * (CONTAINER_W - ITEM_W - 20) + 10;
       el.style.left = x + 'px';
       el.style.top  = '-50px';
@@ -325,6 +377,7 @@
       // スコア加算（1点/秒）
       score += dt;
       scoreEl.textContent = Math.floor(score);
+      bestEl.textContent  = Math.floor(best);
 
       // 難易度上昇
       const s = Math.floor(score);
