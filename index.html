@@ -227,12 +227,13 @@
     function gameOver() {
       gameRunning = false;
       cancelAnimationFrame(animFrame);
-      if (score > best) {
-        best = score;
+      const finalScore = Math.floor(score);
+      if (finalScore > best) {
+        best = finalScore;
         bestEl.textContent = best;
       }
       overlayTitle.textContent = 'ざんねん！🌟';
-      overlayMsg.textContent   = `スコア：${score}　さいこうき録：${best}`;
+      overlayMsg.textContent   = `スコア：${finalScore}　さいこうき録：${best}`;
       startBtn.textContent     = '▶ もういちど！';
       overlay.style.display    = 'flex';
     }
@@ -310,12 +311,13 @@
       lastTime = now;
 
       // スコア加算（時間ベース）
-      score += Math.floor(dt * 10);
-      scoreEl.textContent = score;
+      score += dt * 10;
+      scoreEl.textContent = Math.floor(score);
 
       // 難易度上昇
-      speed = 220 + score * 0.8;
-      spawnInterval = Math.max(0.9, 1.8 - score * 0.004);
+      const s = Math.floor(score);
+      speed = 220 + s * 0.8;
+      spawnInterval = Math.max(0.9, 1.8 - s * 0.004);
 
       // 障害物スポーン
       spawnTimer += dt;
